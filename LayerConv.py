@@ -6,7 +6,7 @@ import numpy as np
 from Layer import Layer, Layers_type, Activation_fn
 
 
-class PoolingFn(Enum):
+class Pooling_fn(Enum):
     MAX = "max"
     AVERAGE = "average"
 
@@ -25,7 +25,7 @@ class Specification_conv:
 class Specification_pooling:
     p_filter: int
     p_stride: int
-    p_function: PoolingFn
+    p_function: Pooling_fn
 
 
 @dataclass
@@ -195,9 +195,9 @@ def forward_pooling_step(
                     0, h_start:h_end, w_start:w_end, f
                 ]  # assuming batch size of 1
 
-                if fnc == PoolingFn.MAX:
+                if fnc == Pooling_fn.MAX:
                     data_out[0, h, w, f] = np.max(X_slice)
-                elif fnc == PoolingFn.AVERAGE:
+                elif fnc == Pooling_fn.AVERAGE:
                     data_out[0, h, w, f] = np.mean(X_slice)
                 else:
                     raise ValueError(f"Unsupported pooling function: {fnc}")
@@ -296,7 +296,7 @@ def backward__pooling_step(
                 if window.size == 0:  # Skip empty windows
                     continue
 
-                if specification.p_function == PoolingFn.MAX:
+                if specification.p_function == Pooling_fn.MAX:
                     idx = np.unravel_index(np.argmax(window), window.shape)
                     i_max, j_max = idx
 
@@ -304,7 +304,7 @@ def backward__pooling_step(
                         0, h_start + i_max, w_start + j_max, current_filter
                     ] += gradient_in[0, p, q, current_filter]
 
-                elif specification.p_function == PoolingFn.AVERAGE:
+                elif specification.p_function == Pooling_fn.AVERAGE:
                     avg_grad = gradient_in[0, p, q, current_filter] / window.size
                     dZ[0, h_start:h_end, w_start:w_end, current_filter] += avg_grad
 
@@ -476,13 +476,40 @@ class LayerConv(Layer):
             int, int, int, int
         ],  # (batch_size, height, width, channels),
         specification: Specification_conv,
-        name: str,
+        name: str | None = None,
     ):
         super().__init__(
             layer_type=Layers_type.CONVOLUTIONAL,
             input_shape=input_shape,
-            name="conv_layer",
+            name=name,
         )
+        self.specification = specification
+
+    def forward(self, data_in: np.ndarray):
+        pass
+
+    def backward(self, gradient_in: np.ndarray, cache: Cache):
+        pass
+
+    def initialize_parameters(self):
+        raise NotImplementedError
+
+
+class LayerPooling(Layer):
+    """
+    Pooling Layer class
+    """
+
+    def __init__(
+        self,
+        specification: Specification_pooling,
+        name: str | None = None,
+    ):
+        super().__init__(
+            layer_type=Layers_type.CONVOLUTIONAL,
+            name=name,
+        )
+        self.specification = specification
 
     def forward(self, data_in: np.ndarray):
         pass

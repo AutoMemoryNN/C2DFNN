@@ -3,7 +3,13 @@ from enum import Enum
 
 from Layer import Layer, Layers_type, Activation_fn
 from LayerDense import LayerDense
-from LayerConv import LayerConv, Specification_conv
+from LayerConv import (
+    LayerConv,
+    LayerPooling,
+    Pooling_fn,
+    Specification_conv,
+    Specification_pooling,
+)
 
 
 class loss(Enum):
@@ -110,8 +116,29 @@ if __name__ == "__main__":
                 c_pad=0,
                 activation=Activation_fn.RELU,
             ),
-            name="conv_layer_1",
-        )
+        ),
+        LayerPooling(
+            specification=Specification_pooling(
+                p_filter=2, p_stride=2, p_function=Pooling_fn.MAX
+            ),
+            name="pooling_layer_interesting",
+        ),
+        LayerConv(
+            input_shape=(1, 26, 26, 32),
+            specification=Specification_conv(
+                c_filter=3,
+                c_channels=32,
+                c_filters=64,
+                c_stride=1,
+                c_pad=0,
+                activation=Activation_fn.RELU,
+            ),
+        ),
+        LayerPooling(
+            specification=Specification_pooling(
+                p_filter=2, p_stride=2, p_function=Pooling_fn.MAX
+            ),
+        ),
     ]
 
     # You can now use layers for further processing

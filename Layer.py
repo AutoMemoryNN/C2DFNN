@@ -20,7 +20,7 @@ class Layer(ABC):
     def __init__(
         self,
         layer_type: Layers_type,
-        input_shape: tuple[int, ...],
+        input_shape: tuple[int, ...] | None = None,
         name: str | None = None,
     ):
         self.layer_type = layer_type
