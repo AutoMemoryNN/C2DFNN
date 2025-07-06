@@ -1,19 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from Layer import Layer
-
-
-class layers(Enum):
-    CONVOLUTIONAL = "convolutional"
-    FLATTER = "flatter"
-    DENSE = "dense"
-
-
-class activation(Enum):
-    RELU = "relu"
-    SIGMOID = "sigmoid"
-    TANH = "tanh"
+from Layer import Layer, Layers_type, Activation_fn
+from LayerDense import LayerDense
+from LayerConv import LayerConv, Specification_conv
 
 
 class loss(Enum):
@@ -47,11 +37,11 @@ class Network:
                 )
 
             if layer.name is None:
-                if layer.get_layer_type() == layers.CONVOLUTIONAL:
+                if layer.get_layer_type() == Layers_type.CONVOLUTIONAL:
                     layer.name = f"conv_layer_{i}"
-                elif layer.get_layer_type() == layers.FLATTER:
+                elif layer.get_layer_type() == Layers_type.FLATTER:
                     layer.name = f"flatter_layer_{i}"
-                elif layer.get_layer_type() == layers.DENSE:
+                elif layer.get_layer_type() == Layers_type.DENSE:
                     layer.name = f"dense_layer_{i}"
 
             previous_layer = self.layers[i - 1]
@@ -109,4 +99,20 @@ class Network:
 
 if __name__ == "__main__":
 
-    pass
+    layers = [
+        LayerConv(
+            input_shape=(1, 28, 28, 1),
+            specification=Specification_conv(
+                c_filter=3,
+                c_channels=1,
+                c_filters=32,
+                c_stride=1,
+                c_pad=0,
+                activation=Activation_fn.RELU,
+            ),
+            name="conv_layer_1",
+        )
+    ]
+
+    # You can now use layers for further processing
+    # For example: network = Network(LayersConfig(layers))

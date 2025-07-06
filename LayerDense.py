@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from Layer import Layer, Layers_type
+
 
 def initialize_parameters(layers: list) -> dict:
     """
@@ -390,50 +392,8 @@ def one_hot_encode(y, num_classes=5):
     return encoded
 
 
-class LayerDense:
-    """
-    Clase para una capa densa de una red neuronal.
-
-    Atributos:
-    n_in -- número de entradas (dimensión de la capa anterior)
-    n_out -- número de salidas (dimensión de la capa actual)
-    activation -- función de activación a aplicar ("sigmoid", "relu", "tanh", "softmax", "lineal")
-    parameters -- diccionario con los parámetros "W" y "b"
-    """
-
-    def __init__(self, n_in, n_out, activation):
-        self.n_in = n_in
-        self.n_out = n_out
-        self.activation = activation
-        self.parameters = initialize_parameters([n_in, n_out])
-
-    def forward(self, A_prev):
-        """
-        Realiza la propagación hacia adelante en la capa.
-
-        Argumentos:
-        A_prev -- activaciones de la capa anterior (shape: [n_prev, m])
-
-        Retorna:
-        A -- activaciones de la capa actual (shape: [n_out, m])
-        cache -- tuple con (A_prev, W, b, activation, Z) para posible retropropagación o debugging
-        """
-        W = self.parameters["W1"]
-        b = self.parameters["b1"]
-        A, cache = forward_step(A_prev, W, b, self.activation)
-        return A, cache
-
-    def backward(self, dA, cache):
-        """
-        Realiza la retropropagación en la capa.
-
-        Argumentos:
-        dA -- gradiente de activación de la capa siguiente
-        cache -- tuple con (A_prev, W, b, activation, Z) de la propagación hacia adelante
-
-        Retorna:
-        dA_prev -- gradiente de activación de la capa anterior
-        dW -- gradiente de W (capa actual)
-        db -- gradiente de b (capa actual)
-        """
-        return backward_step(dA, cache, self.activation)
+class LayerDense(Layer):
+    def __init__(self, input_shape: tuple[int], output_shape, activation, name):
+        super().__init__(
+            layer_type=Layers_type.DENSE, input_shape=input_shape, name=name
+        )

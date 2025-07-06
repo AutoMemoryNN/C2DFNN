@@ -3,11 +3,7 @@ from enum import Enum
 from typing import Literal, Tuple
 import numpy as np
 
-
-class ActivationFn(Enum):
-    RELU = "relu"
-    SIGMOID = "sigmoid"
-    TANH = "tanh"
+from Layer import Layer, Layers_type, Activation_fn
 
 
 class PoolingFn(Enum):
@@ -16,13 +12,17 @@ class PoolingFn(Enum):
 
 
 @dataclass
-class Specification:
+class Specification_conv:
     c_filter: int
     c_channels: int
     c_filters: int
     c_stride: int
     c_pad: int
-    activation: ActivationFn
+    activation: Activation_fn
+
+
+@dataclass
+class Specification_pooling:
     p_filter: int
     p_stride: int
     p_function: PoolingFn
@@ -87,7 +87,7 @@ def one_convolution(X: np.ndarray, W: np.ndarray, b: int) -> int:
 
 
 def forward_convolution_step(
-    data_in: np.ndarray, specification: Specification, parameters: Parameters
+    data_in: np.ndarray, specification: Specification_conv, parameters: Parameters
 ) -> np.ndarray:
     """
     Do a forward convolution step
@@ -137,7 +137,7 @@ def forward_convolution_step(
 
 
 def forward_activation_step(
-    data_in: np.ndarray, specification: Specification
+    data_in: np.ndarray, specification: Specification_conv
 ) -> np.ndarray:
     """
     Do a forward activation step
@@ -150,18 +150,18 @@ def forward_activation_step(
 
     fnc = specification.activation
 
-    if fnc == ActivationFn.RELU:
+    if fnc == Activation_fn.RELU:
         return np.maximum(0, data_in)
-    elif fnc == ActivationFn.SIGMOID:
+    elif fnc == Activation_fn.SIGMOID:
         return 1 / (1 + np.exp(-data_in))
-    elif fnc == ActivationFn.TANH:
+    elif fnc == Activation_fn.TANH:
         return np.tanh(data_in)
     else:
         raise ValueError(f"Unsupported activation function: {fnc}")
 
 
 def forward_pooling_step(
-    data_in: np.ndarray, specification: Specification
+    data_in: np.ndarray, specification: Specification_pooling
 ) -> np.ndarray:
     """
     Do a forward pooling step
@@ -206,7 +206,10 @@ def forward_pooling_step(
 
 
 def forward_convolutional(
-    data_in: np.ndarray, specification: Specification, parameters: Parameters
+    data_in: np.ndarray,
+    specification_conv: Specification_conv,
+    specification_pooling: Specification_pooling,
+    parameters: Parameters,
 ) -> Tuple[np.ndarray, Cache]:
     """
     Do forward convolutional propagation
@@ -226,21 +229,21 @@ def forward_convolutional(
 
     # Check if parameters shape matches specification
     expected_w_shape = (
-        specification.c_filter,
-        specification.c_filter,
-        specification.c_channels,
-        specification.c_filters,
+        specification_conv.c_filter,
+        specification_conv.c_filter,
+        specification_conv.c_channels,
+        specification_conv.c_filters,
     )
     if parameters.W.shape != expected_w_shape:
         raise ValueError(
             f"Parameters W shape {parameters.W.shape} doesn't match expected {expected_w_shape}"
         )
 
-    data_conv = forward_convolution_step(data_in, specification, parameters)
+    data_conv = forward_convolution_step(data_in, specification_conv, parameters)
 
-    data_act = forward_activation_step(data_conv, specification)
+    data_act = forward_activation_step(data_conv, specification_conv)
 
-    data_out = forward_pooling_step(data_act, specification)
+    data_out = forward_pooling_step(data_act, specification_pooling)
 
     return (
         data_out,
@@ -254,7 +257,7 @@ def forward_convolutional(
 
 
 def backward__pooling_step(
-    gradient_in: np.ndarray, specification: Specification, cache: Cache
+    gradient_in: np.ndarray, specification: Specification_pooling, cache: Cache
 ) -> Tuple[np.ndarray, Gradient]:
     """
     Do a backward pooling step
@@ -328,12 +331,12 @@ def backward_activation_step(gradient_in, specification, cache):
     cost_gradient_out –-
     parameters_gradient --
     """
-    if specification.activation == ActivationFn.RELU:
+    if specification.activation == Activation_fn.RELU:
         dZ = np.where(cache.data_conv > 0, gradient_in, 0)
-    elif specification.activation == ActivationFn.SIGMOID:
+    elif specification.activation == Activation_fn.SIGMOID:
         sig = cache.data_act
         dZ = sig * (1 - sig) * gradient_in
-    elif specification.activation == ActivationFn.TANH:
+    elif specification.activation == Activation_fn.TANH:
         dZ = (1 - np.square(cache.data_act)) * gradient_in
     else:
         raise ValueError(f"Unsupported activation function: {specification.activation}")
@@ -462,21 +465,30 @@ def to_dense(data_in):
     return data_out
 
 
-class LayerConv:
+class LayerConv(Layer):
     """
     Convolutional Layer class
     """
 
-    def __init__(self, specification: Specification, parameters: Parameters):
-        self.specification = specification
-        self.parameters = parameters
-
-    def forward(self, data_in: np.ndarray) -> Tuple[np.ndarray, Cache]:
-        return forward_convolutional(data_in, self.specification, self.parameters)
-
-    def backward(
-        self, gradient_in: np.ndarray, cache: Cache
-    ) -> Tuple[np.ndarray, Gradient]:
-        return backward_convolutional(
-            gradient_in, self.specification, cache, self.parameters
+    def __init__(
+        self,
+        input_shape: Tuple[
+            int, int, int, int
+        ],  # (batch_size, height, width, channels),
+        specification: Specification_conv,
+        name: str,
+    ):
+        super().__init__(
+            layer_type=Layers_type.CONVOLUTIONAL,
+            input_shape=input_shape,
+            name="conv_layer",
         )
+
+    def forward(self, data_in: np.ndarray):
+        pass
+
+    def backward(self, gradient_in: np.ndarray, cache: Cache):
+        pass
+
+    def initialize_parameters(self):
+        raise NotImplementedError
