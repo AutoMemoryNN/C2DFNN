@@ -129,14 +129,42 @@ class LayerConv(Layer):
             W=np.ndarray([]),
             b=np.ndarray([]),
         )
-        # TODO: Initialize parameters in the constructor or in a separate method
+
+        self.gradient = Gradient(
+            dW=np.ndarray([]),
+            db=np.ndarray([]),
+        )
 
     def backward(self, gradient_in: np.ndarray, cache: Cache_conv) -> np.ndarray:
         data_out, gradient = self._backward_convolutional(gradient_in)
+        self._update_parameters(
+            gradient, learning_rate=0.01
+        )  # TODO: Learning rate hardcoded
         return data_out
 
     def initialize_parameters(self):
-        raise NotImplementedError
+        """
+        Initialize parameters for the convolutional layer.
+        W: (c_filter, c_filter, c_channels, c_filters)
+        b: (1, 1, 1, c_filters)
+        """
+        filter_size = self.specification.c_filter
+        n_channels = self.specification.c_channels
+        n_filters = self.specification.c_filters
+
+        W_shape = (
+            filter_size,
+            filter_size,
+            n_channels,
+            n_filters,
+        )
+
+        self.parameters.W = np.random.randn(*W_shape) * 0.01
+        self.parameters.b = np.zeros((1, 1, 1, n_filters))
+
+        # for gradients
+        self.gradient.dW = np.zeros_like(self.parameters.W, dtype=np.float64)
+        self.gradient.db = np.zeros_like(self.parameters.b, dtype=np.float64)
 
     def _add_pad(self, data_in: np.ndarray, pad: int) -> np.ndarray:
         """
@@ -409,6 +437,19 @@ class LayerConv(Layer):
         total_gradient = Gradient(dW=grad_conv.dW, db=grad_conv.db)
 
         return dA_conv, total_gradient
+
+    def _update_parameters(self, gradient: Gradient, learning_rate: float):
+        """
+        Update parameters using gradient descent
+        Arguments:
+        parameters –- current parameters
+        gradient –- computed gradients
+        learning_rate –- learning rate for the update
+        Returns:
+        updated_parameters -- updated parameters after applying the gradients
+        """
+        self.parameters.W -= learning_rate * self.gradient.dW
+        self.parameters.b -= learning_rate * self.gradient.db
 
 
 class LayerPooling(Layer):
