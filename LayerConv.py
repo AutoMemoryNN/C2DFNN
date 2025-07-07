@@ -53,29 +53,49 @@ class Gradient:
     db: np.ndarray
 
 
-def to_dense(data_in):
+class LayerFlatten(Layer):
     """
-    Convert 2D Convolutional Layer output to a Dense Layer input
-    Arguments:
-    data_in – Input data with shape (batch_size, height, width, channels)
-    Returns:
-    data_out – Flattened output with shape (batch_size, height * width * channels)
+    Flatten Layer class
+    Converts 2D Convolutional Layer output to a Dense Layer input
     """
-    if not isinstance(data_in, np.ndarray):
-        raise TypeError("data_in must be a numpy array")
 
-    if data_in.ndim != 4:
-        raise ValueError(
-            f"Expected data_in to have 4 dimensions (batch, height, width, channels), got {data_in.ndim}"
-        )
+    def __init__(self, name: str | None = None):
+        super().__init__(layer_type=Layers_type.FLATTER, name=name)
+        self.previous_shape = None
 
-    batch_size, height, width, channels = data_in.shape
+    def forward(self, data_in: np.ndarray) -> np.ndarray:
+        self.previous_shape = data_in.shape
+        return self._to_dense(data_in)
 
-    # Flatten all dimensions except the batch dimension
-    # Shape: (batch_size, height * width * channels)
-    data_out = data_in.reshape(batch_size, height * width * channels)
+    def backward(self, gradient_in: np.ndarray) -> np.ndarray:
+        if self.previous_shape is None:
+            raise ValueError("forward must be called before backward")
 
-    return data_out
+        return gradient_in.reshape(self.previous_shape)
+
+    def _to_dense(self, data_in):
+        """
+        Convert 2D Convolutional Layer output to a Dense Layer input
+        Arguments:
+        data_in – Input data with shape (batch_size, height, width, channels)
+        Returns:
+        data_out – Flattened output with shape (batch_size, height * width * channels)
+        """
+        if not isinstance(data_in, np.ndarray):
+            raise TypeError("data_in must be a numpy array")
+
+        if data_in.ndim != 4:
+            raise ValueError(
+                f"Expected data_in to have 4 dimensions (batch, height, width, channels), got {data_in.ndim}"
+            )
+
+        batch_size, height, width, channels = data_in.shape
+
+        # Flatten all dimensions except the batch dimension
+        # Shape: (batch_size, height * width * channels)
+        data_out = data_in.reshape(batch_size, height * width * channels)
+
+        return data_out
 
 
 # TODO: continue form Gradient
