@@ -112,13 +112,13 @@ class LayerConv(Layer):
         # TODO: Initialize parameters in the constructor or in a separate method
 
     def backward(self, gradient_in: np.ndarray, cache: Cache_conv) -> np.ndarray:
-        data_out, gradient = self.backward_convolutional(gradient_in)
+        data_out, gradient = self._backward_convolutional(gradient_in)
         return data_out
 
     def initialize_parameters(self):
         raise NotImplementedError
 
-    def add_pad(self, data_in: np.ndarray, pad: int) -> np.ndarray:
+    def _add_pad(self, data_in: np.ndarray, pad: int) -> np.ndarray:
         """
         Pad all examples of data_in
         Arguments:
@@ -135,7 +135,7 @@ class LayerConv(Layer):
         )
         return data_out
 
-    def one_convolution(self, X: np.ndarray, W: np.ndarray, b: float) -> float:
+    def _one_convolution(self, X: np.ndarray, W: np.ndarray, b: float) -> float:
         """
         Calculate one convolution value
         Arguments:
@@ -153,7 +153,7 @@ class LayerConv(Layer):
         v = np.sum(X * W) + b
         return v
 
-    def forward_convolution_step(
+    def _forward_convolution_step(
         self,
         data_in: np.ndarray,
         specification: Specification_conv,
@@ -174,7 +174,7 @@ class LayerConv(Layer):
         filter_size = specification.c_filter
         n_filters = specification.c_filters
 
-        Xp = self.add_pad(data_in, padding)
+        Xp = self._add_pad(data_in, padding)
 
         _, h_in, w_in, n_channels = Xp.shape
         print(f"Input shape: {Xp.shape}")
@@ -199,13 +199,13 @@ class LayerConv(Layer):
                     W_slice = parameters.W[:, :, :, f]
                     b_slice = parameters.b[0, 0, 0, f]
 
-                    data_out[0, h, w, f] = self.one_convolution(
+                    data_out[0, h, w, f] = self._one_convolution(
                         X_slice_adjusted, W_slice, b_slice
                     )
 
         return data_out
 
-    def forward_activation_step(
+    def _forward_activation_step(
         self, data_in: np.ndarray, specification: Specification_conv
     ) -> np.ndarray:
         """
@@ -264,11 +264,11 @@ class LayerConv(Layer):
                 f"Parameters W shape {parameters.W.shape} doesn't match expected {expected_w_shape}"
             )
 
-        data_conv = self.forward_convolution_step(
+        data_conv = self._forward_convolution_step(
             data_in, specification_conv, parameters
         )
 
-        data_act = self.forward_activation_step(data_conv, specification_conv)
+        data_act = self._forward_activation_step(data_conv, specification_conv)
 
         return (
             data_act,
@@ -279,7 +279,7 @@ class LayerConv(Layer):
             ),
         )
 
-    def backward_activation_step(self, gradient_in):
+    def _backward_activation_step(self, gradient_in):
         """
         Do a backward activation step
         Arguments:
@@ -307,7 +307,7 @@ class LayerConv(Layer):
 
         return dZ, Gradient(dW, db)
 
-    def backward_convolution_step(self, gradient_in):
+    def _backward_convolution_step(self, gradient_in):
         """
         Do a backward convolution step
         Arguments:
@@ -328,7 +328,7 @@ class LayerConv(Layer):
         m, h_out, w_out, n_f = gradient_in.shape
 
         # Add padding to input data for gradient computation
-        data_in_padded = self.add_pad(self.cache.data_in, pad)
+        data_in_padded = self._add_pad(self.cache.data_in, pad)
 
         # Initialize gradients with correct shapes and ensure float dtype
         dW = np.zeros_like(self.parameters.W, dtype=np.float64)
@@ -341,7 +341,7 @@ class LayerConv(Layer):
         # Compute gradients
         for h in range(h_out):
             for w in range(w_out):
-                for f in range(n_filters):
+                for f in range(n_f):
                     # Define slice boundaries
                     h_start = h * stride
                     h_end = h_start + filter_size
@@ -369,7 +369,7 @@ class LayerConv(Layer):
 
         return dA_prev, Gradient(dW, db)
 
-    def backward_convolutional(self, gradient_in):
+    def _backward_convolutional(self, gradient_in):
         """
         Do backward convolutional layer propagation
         Arguments:
@@ -381,9 +381,9 @@ class LayerConv(Layer):
         cost_gradient_out –-
         parameters_gradient --
         """
-        dA_act, gradient_act = self.backward_activation_step(gradient_in)
+        dA_act, gradient_act = self._backward_activation_step(gradient_in)
 
-        dA_conv, grad_conv = self.backward_convolution_step(dA_act)
+        dA_conv, grad_conv = self._backward_convolution_step(dA_act)
 
         # only convolutional parameters went
         total_gradient = Gradient(dW=grad_conv.dW, db=grad_conv.db)
@@ -412,12 +412,12 @@ class LayerPooling(Layer):
         self.specification = specification
 
     def forward(self, data_in: np.ndarray) -> Tuple[np.ndarray, Cache_pooling]:
-        data_out, cache = self.forward_pooling_step(data_in)
+        data_out, cache = self._forward_pooling_step(data_in)
         self.cache = cache
         return data_out, cache
 
     def backward(self, gradient_in: np.ndarray) -> np.ndarray:
-        gradient_out, gradient = self.backward_pooling_step(gradient_in)
+        gradient_out, gradient = self._backward_pooling_step(gradient_in)
         return gradient_out
 
     def initialize_parameters(self):
@@ -427,7 +427,7 @@ class LayerPooling(Layer):
         """
         pass
 
-    def forward_pooling_step(self, data_in: np.ndarray) -> np.ndarray:
+    def _forward_pooling_step(self, data_in: np.ndarray) -> np.ndarray:
         """
         Do a forward pooling step
         Arguments:
@@ -469,7 +469,7 @@ class LayerPooling(Layer):
 
         return data_out
 
-    def backward_pooling_step(
+    def _backward_pooling_step(
         self,
         gradient_in: np.ndarray,
     ) -> Tuple[np.ndarray, Gradient]:
