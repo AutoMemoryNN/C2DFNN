@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 from enum import Enum
 
+import numpy as np
+
 from Layer import Layer, Layers_type, Activation_fn
-from LayerDense import LayerDense
+from LayerDense_v2 import LayerDense
 from LayerConv import (
     LayerConv,
+    LayerFlatten,
     LayerPooling,
     Pooling_fn,
     Specification_conv,
@@ -12,7 +15,7 @@ from LayerConv import (
 )
 
 
-class loss(Enum):
+class loss_fn(Enum):
     CATEGORICAL_CROSSENTROPY = "categorical_crossentropy"
     MEAN_SQUARED_ERROR = "mse"
     BINARY_CROSSENTROPY = "binary_crossentropy"
@@ -27,7 +30,7 @@ class Network:
     def __init__(self, layers: LayersConfig) -> None:
         self.layers = layers.layersConfig
         self.init_layers()
-        self.parameters = {}
+        self.parameters = {}  # TODO: Necessary?
         self.activations = {}
         self.initialize_parameters(self.layers)
 
@@ -45,7 +48,7 @@ class Network:
             if layer.name is None:
                 if layer.get_layer_type() == Layers_type.CONVOLUTIONAL:
                     layer.name = f"conv_layer_{i}"
-                elif layer.get_layer_type() == Layers_type.FLATTER:
+                elif layer.get_layer_type() == Layers_type.FLATTEN:
                     layer.name = f"flatter_layer_{i}"
                 elif layer.get_layer_type() == Layers_type.DENSE:
                     layer.name = f"dense_layer_{i}"
@@ -80,8 +83,17 @@ class Network:
     def load_y_data(self, file_path):
         pass
 
-    def cost(self, Yp, Y, costfunction):
-        pass
+    def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn) -> np.ndarray:
+        if costfunction == loss_fn.CATEGORICAL_CROSSENTROPY:
+            return -np.sum(Y * np.log(Yp + 1e-15), axis=1)
+        elif costfunction == loss_fn.MEAN_SQUARED_ERROR:
+            return np.mean(np.square(Y - Yp), axis=1)
+        elif costfunction == loss_fn.BINARY_CROSSENTROPY:
+            return -np.mean(
+                Y * np.log(Yp + 1e-15) + (1 - Y) * np.log(1 - Yp + 1e-15), axis=1
+            )
+        else:
+            raise ValueError(f"Unsupported cost function: {costfunction}")
 
     def update_parameters(self, parameters, grads, learning_rate):
         pass
@@ -90,13 +102,10 @@ class Network:
         self,
         X,
         Y,
-        hidden_layers,
         learning_rate,
         num_iterations,
-        costfunction,
-        activations,
         print_cost=False,
-    ):
+    ):  # user cannot choice the loss function
         pass
 
     def one_hot_encode(self, y, num_classes):
@@ -138,6 +147,20 @@ if __name__ == "__main__":
             specification=Specification_pooling(
                 p_filter=2, p_stride=2, p_function=Pooling_fn.MAX
             ),
+        ),
+        LayerFlatten(),
+        LayerDense(
+            (128,),
+            Activation_fn.RELU,
+        ),
+        LayerDense(
+            (64,),
+            Activation_fn.RELU,
+        ),
+        LayerDense(
+            (10,),
+            Activation_fn.SOFTMAX,
+            name="output_layer",
         ),
     ]
 

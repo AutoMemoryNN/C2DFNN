@@ -60,7 +60,7 @@ class LayerFlatten(Layer):
     """
 
     def __init__(self, name: str | None = None):
-        super().__init__(layer_type=Layers_type.FLATTER, name=name)
+        super().__init__(layer_type=Layers_type.FLATTEN, name=name)
         self.previous_shape = None
 
     def forward(self, data_in: np.ndarray) -> np.ndarray:
@@ -97,6 +97,13 @@ class LayerFlatten(Layer):
 
         return data_out
 
+    def initialize_parameters(self):
+        """
+        Initialize parameters for the flatten layer.
+        Flatten layers typically do not have learnable parameters, so this method can be empty.
+        """
+        pass
+
 
 # TODO: continue form Gradient
 class LayerConv(Layer):
@@ -106,10 +113,10 @@ class LayerConv(Layer):
 
     def __init__(
         self,
-        input_shape: Tuple[
-            int, int, int, int
-        ],  # (batch_size, height, width, channels),
         specification: Specification_conv,
+        input_shape: (
+            Tuple[int, int, int, int] | None
+        ) = None,  # (batch_size, height, width, channels),
         name: str | None = None,
     ):
         super().__init__(
@@ -135,7 +142,7 @@ class LayerConv(Layer):
             db=np.ndarray([]),
         )
 
-    def backward(self, gradient_in: np.ndarray, cache: Cache_conv) -> np.ndarray:
+    def backward(self, gradient_in: np.ndarray) -> np.ndarray:
         data_out, gradient = self._backward_convolutional(gradient_in)
         self._update_parameters(
             gradient, learning_rate=0.01
@@ -279,9 +286,7 @@ class LayerConv(Layer):
     def forward(
         self,
         data_in: np.ndarray,
-        specification_conv: Specification_conv,
-        parameters: Parameters,
-    ) -> Tuple[np.ndarray, Cache_conv]:
+    ) -> np.ndarray:
         """
         Do forward convolutional propagation
         Arguments:
@@ -302,30 +307,29 @@ class LayerConv(Layer):
 
         # Check if parameters shape matches specification
         expected_w_shape = (
-            specification_conv.c_filter,
-            specification_conv.c_filter,
-            specification_conv.c_channels,
-            specification_conv.c_filters,
+            self.specification.c_filter,
+            self.specification.c_filter,
+            self.specification.c_channels,
+            self.specification.c_filters,
         )
-        if parameters.W.shape != expected_w_shape:
+        if self.parameters.W.shape != expected_w_shape:
             raise ValueError(
-                f"Parameters W shape {parameters.W.shape} doesn't match expected {expected_w_shape}"
+                f"Parameters W shape {self.parameters.W.shape} doesn't match expected {expected_w_shape}"
             )
 
         data_conv = self._forward_convolution_step(
-            data_in, specification_conv, parameters
+            data_in, self.specification, self.parameters
         )
 
-        data_act = self._forward_activation_step(data_conv, specification_conv)
+        data_act = self._forward_activation_step(data_conv, self.specification)
 
-        return (
-            data_act,
-            Cache_conv(
-                data_in=data_in,
-                data_conv=data_conv,
-                data_act=data_act,
-            ),
+        self.cache = Cache_conv(
+            data_in=data_in,
+            data_conv=data_conv,
+            data_act=data_act,
         )
+
+        return data_act
 
     def _backward_activation_step(self, gradient_in):
         """
@@ -472,10 +476,10 @@ class LayerPooling(Layer):
         )
         self.specification = specification
 
-    def forward(self, data_in: np.ndarray) -> Tuple[np.ndarray, Cache_pooling]:
+    def forward(self, data_in: np.ndarray) -> np.ndarray:
         data_out, cache = self._forward_pooling_step(data_in)
         self.cache = cache
-        return data_out, cache
+        return data_out
 
     def backward(self, gradient_in: np.ndarray) -> np.ndarray:
         gradient_out, gradient = self._backward_pooling_step(gradient_in)

@@ -6,7 +6,7 @@ import numpy as np
 
 class Layers_type(Enum):
     CONVOLUTIONAL = "convolutional"
-    FLATTER = "flatter"
+    FLATTEN = "flatten"
     DENSE = "dense"
 
 
@@ -14,6 +14,7 @@ class Activation_fn(Enum):
     RELU = "relu"
     SIGMOID = "sigmoid"
     TANH = "tanh"
+    SOFTMAX = "softmax"
 
 
 class Layer(ABC):
@@ -50,6 +51,14 @@ class Layer(ABC):
     @abstractmethod
     def initialize_parameters(self):
         # This method should be overridden in subclasses to initialize parameters specific to the layer type
+        raise NotImplementedError("This method should be overridden in subclasses")
+
+    @abstractmethod
+    def forward(self, data_in: np.ndarray) -> np.ndarray:
+        raise NotImplementedError("This method should be overridden in subclasses")
+
+    @abstractmethod
+    def backward(self, gradient_in: np.ndarray) -> np.ndarray:
         raise NotImplementedError("This method should be overridden in subclasses")
 
     def __repr__(self):

@@ -69,7 +69,7 @@ class LayerDense(Layer):
         cache = (A_prev, W, b, activation, Z)
         return A, cache
 
-    def forward(self, X, parameters, activations):
+    def forward(self, X, parameters, activations):  # type: ignore
         """
         Realiza la propagación hacia adelante en la red.
 
@@ -257,7 +257,7 @@ class LayerDense(Layer):
         return dA_prev, dW, db
 
     # Ayuda: np.sum(…, axis=1, keepdims=True)
-    def backward(self, AL, Y, caches, activations: list, cost_function) -> dict:
+    def backward(self, AL, Y, caches, activations: list, cost_function) -> dict:  # type: ignore
         """
         Realiza la retropropagación de la red.
 
