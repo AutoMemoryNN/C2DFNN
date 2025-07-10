@@ -49,6 +49,8 @@ class LayerDense(Layer):
         )
 
         self.is_initialized = False
+        self.already_forwarded = False
+        self.already_backwarded = False
 
         self.cache = None
         self.activation_fn = activation_fn
@@ -122,6 +124,10 @@ class LayerDense(Layer):
             Z_prev=data_in,
             Z_current=Z_current,
         )
+
+        self.already_backwarded = False
+        self.already_forwarded = True
+
         return Z_current
 
     def backward_step(
@@ -168,8 +174,36 @@ class LayerDense(Layer):
     def backward(self, gradient_in: np.ndarray) -> np.ndarray:
         if not self.is_initialized:
             raise ValueError("Parameters must be initialized before backward pass.")
+        if not self.already_forwarded:
+            raise ValueError("Forward pass must be called before backward step.")
 
         dZ_prev, gradients = self.backward_step(gradient_in)
         self.gradients = gradients
 
+        self.already_forwarded = False
+        self.already_backwarded = True
+
         return dZ_prev
+
+    def update_parameters(self, learning_rate: float):
+        if not self.is_initialized:
+            raise ValueError("Parameters must be initialized before updating.")
+
+        if not self.already_backwarded:
+            raise ValueError("Backward pass must be called before updating parameters.")
+
+        W = self.parameters.weights
+        b = self.parameters.biases
+
+        gW = self.gradients.g_weights
+        gb = self.gradients.g_biases
+
+        # Update weights and biases with momentum
+        W -= learning_rate * gW
+        b -= learning_rate * gb
+
+        # Update parameters
+        self.parameters.weights = W
+        self.parameters.biases = b
+
+        self.already_backwarded = False

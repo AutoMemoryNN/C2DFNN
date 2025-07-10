@@ -32,7 +32,6 @@ class Network:
         self.init_layers()
         self.parameters = {}  # TODO: Necessary?
         self.activations = {}
-        self.initialize_parameters(self.layers)
 
     def init_layers(self):
         self.parameters = {}
@@ -67,9 +66,6 @@ class Network:
 
             self.parameters[layer.name] = {}
             self.activations[layer.name] = {}
-
-    def initialize_parameters(self, layers):
-        pass
 
     def predict(self, X, parameters, activations):
         pass
