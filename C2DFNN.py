@@ -73,23 +73,32 @@ class Network:
     def accuracy(self, X, Y, parameters, activations):
         pass
 
-    def mse(self, X, Y, parameters, activations):
-        pass
-
     def load_y_data(self, file_path):
         pass
 
     def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn) -> np.ndarray:
-        if costfunction == loss_fn.CATEGORICAL_CROSSENTROPY:
+        output_layer = self.layers[-1]
+        if (
+            costfunction == loss_fn.CATEGORICAL_CROSSENTROPY
+            and output_layer.get_activation_function() == Activation_fn.SOFTMAX
+        ):
             return -np.sum(Y * np.log(Yp + 1e-15), axis=1)
-        elif costfunction == loss_fn.MEAN_SQUARED_ERROR:
+        elif (
+            costfunction == loss_fn.MEAN_SQUARED_ERROR
+            and output_layer.get_activation_function() == Activation_fn.RELU
+        ):
             return np.mean(np.square(Y - Yp), axis=1)
-        elif costfunction == loss_fn.BINARY_CROSSENTROPY:
+        elif (
+            costfunction == loss_fn.BINARY_CROSSENTROPY
+            and output_layer.get_activation_function() == Activation_fn.SIGMOID
+        ):
             return -np.mean(
                 Y * np.log(Yp + 1e-15) + (1 - Y) * np.log(1 - Yp + 1e-15), axis=1
             )
         else:
-            raise ValueError(f"Unsupported cost function: {costfunction}")
+            raise ValueError(
+                f"Unsupported cost function or cost functions {costfunction} is not compatible with the output layer's activation function {output_layer.get_activation_function()}."
+            )
 
     def update_parameters(self, parameters, grads, learning_rate):
         pass

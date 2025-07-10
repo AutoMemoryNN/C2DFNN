@@ -207,3 +207,6 @@ class LayerDense(Layer):
         self.parameters.biases = b
 
         self.already_backwarded = False
+
+    def get_activation_function(self) -> Activation_fn:
+        return self.activation_fn

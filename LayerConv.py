@@ -455,6 +455,9 @@ class LayerConv(Layer):
         self.parameters.W -= learning_rate * self.gradient.dW
         self.parameters.b -= learning_rate * self.gradient.db
 
+    def get_activation_function(self) -> Activation_fn | None:
+        return self.specification.activation
+
 
 class LayerPooling(Layer):
     """
