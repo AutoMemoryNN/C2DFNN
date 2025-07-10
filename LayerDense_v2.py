@@ -34,7 +34,10 @@ class LayerDense(Layer):
             layer_type=Layers_type.DENSE, input_shape=input_shape, name=name
         )
 
-        self.output_shape = output_shape
+        self.output_shape = (
+            1,
+            output_shape[0],
+        )  # batch size is always 1 for this implementation
 
         self.n_neurons_current = None
         self.input_shape = None
@@ -58,31 +61,33 @@ class LayerDense(Layer):
         self.activation_fn = activation_fn
 
     def initialize_parameters(self):
-
         if self.input_shape is None:
-            raise ValueError(
-                "Input shape must be defined before initializing parameters, use set_input_shape() before initialize_parameters()."
-            )
-
-        self.n_neurons_current = self.input_shape[0]
-
+            raise ValueError("Call set_input_shape() first.")
+        _, n_in = self.input_shape
+        n_out = self.output_shape[1]  # output_shape (1, n_neurons_post)
         self.parameters = Parameters_dense(
-            weights=np.random.randn(self.n_neurons_current, self.n_neurons_post)
-            * 0.01,  # shape (n_neurons_current, n_neurons_post)
-            biases=np.zeros((1, self.n_neurons_post)),
+            weights=np.random.randn(n_in, n_out) * 0.01,
+            biases=np.zeros((1, n_out)),
         )
-
         self.gradients = Gradients_dense(
-            g_weights=np.zeros((self.n_neurons_current, self.n_neurons_post)),
-            g_biases=np.zeros((1, self.n_neurons_post)),
+            g_weights=np.zeros((n_in, n_out)),
+            g_biases=np.zeros((1, n_out)),
         )
-
         self.is_initialized = True
 
-    def set_input_shape(self, input_shape: tuple | None):
+    def set_input_shape(self, input_shape: tuple[int, ...] | None):
         if input_shape is None:
             raise ValueError("Input shape cannot be None.")
-        self.input_shape = input_shape
+
+        # (n,) or (1, n)
+        if len(input_shape) == 2 and input_shape[0] == 1:
+            input_shape = (input_shape[1],)
+
+        if len(input_shape) != 1:
+            raise ValueError(f"Input shape must be (n_features,), got {input_shape}")
+
+        self.input_shape = (1, input_shape[0])  # forma interna con batch 1
+        self.n_neurons_current = input_shape[0]
 
     def forward_step(self, data_in: np.ndarray) -> np.ndarray:
         W = self.parameters.weights
@@ -109,17 +114,15 @@ class LayerDense(Layer):
         return Z_current
 
     def forward(self, data_in: np.ndarray) -> np.ndarray:
-        if not self.is_initialized:
-            raise ValueError("Parameters must be initialized before forward pass.")
+        # (n_features,) o (batch, n_features)
+        if data_in.ndim == 1:
+            data_in = data_in.reshape(1, -1)  # batch 1
+        if data_in.ndim != 2:
+            raise ValueError("Expected 1D or 2D input, got shape " + str(data_in.shape))
 
-        if data_in.shape[1] != self.n_neurons_current:
-            raise ValueError(
-                f"Input shape {data_in.shape[1]} does not match expected shape {self.n_neurons_current}."
-            )
-        if self.parameters.weights.shape[0] != data_in.shape[1]:
-            raise ValueError(
-                f"Weight shape {self.parameters.weights.shape[0]} does not match input shape {data_in.shape[1]}."
-            )
+        batch_size, n_in = data_in.shape
+        if n_in != self.n_neurons_current:
+            raise ValueError(f"Expected {self.n_neurons_current} features, got {n_in}")
 
         Z_current = self.forward_step(data_in)
         self.cache = Cache_dense(
@@ -127,9 +130,8 @@ class LayerDense(Layer):
             Z_current=Z_current,
         )
 
-        self.already_backwarded = False
         self.already_forwarded = True
-
+        self.already_backwarded = False
         return Z_current
 
     def backward_step(
@@ -178,6 +180,10 @@ class LayerDense(Layer):
             raise ValueError("Parameters must be initialized before backward pass.")
         if not self.already_forwarded:
             raise ValueError("Forward pass must be called before backward step.")
+
+        if gradient_in.ndim == 1:
+            gradient_in = gradient_in.reshape(1, -1)
+        # batch 1 (batch, n_neurons)
 
         dZ_prev, gradients = self.backward_step(gradient_in)
         self.gradients = gradients

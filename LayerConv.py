@@ -177,8 +177,10 @@ class LayerConv(Layer):
         self.generate_output_shape()
 
     def generate_output_shape(self):
+        batch_size = self.input_shape[0] if self.input_shape[0] != -1 else 1
+
         self.output_shape = (
-            1,  # batch size is always 1 for this implementation
+            batch_size,
             int(
                 (
                     self.input_shape[1]
@@ -287,7 +289,6 @@ class LayerConv(Layer):
         Xp = self._add_pad(data_in, padding)
 
         _, h_in, w_in, n_channels = Xp.shape
-        print(f"Input shape: {Xp.shape}")
 
         h_out = int((h_in - filter_size) // stride + 1)
         w_out = int((w_in - filter_size) // stride + 1)
@@ -419,9 +420,6 @@ class LayerConv(Layer):
         Do a backward convolution step
         Arguments:
         gradient_in –-
-        specification –-
-        cache --
-        parameters --
         Returns:
         cost_gradient_out –-
         parameters_gradient --
@@ -460,12 +458,18 @@ class LayerConv(Layer):
                         np.float64
                     )
 
+                    # FIX: Make sure we only use the channels that match the filter
+                    # The filter expects c_channels, so slice accordingly
+                    n_channels = self.specification.c_channels
+                    a_slice_corrected = a_slice[:, :, :n_channels]
+
                     # Update gradients
-                    dW[:, :, :, f] += a_slice * gradient_in[0, h, w, f]
+                    dW[:, :, :, f] += a_slice_corrected * gradient_in[0, h, w, f]
                     db[0, 0, 0, f] += gradient_in[0, h, w, f]
 
                     # Update gradient w.r.t. input
-                    dA_prev[0, h_start:h_end, w_start:w_end, :] += (
+                    # Only propagate to the channels that were actually used
+                    dA_prev[0, h_start:h_end, w_start:w_end, :n_channels] += (
                         self.parameters.W[:, :, :, f].astype(np.float64)
                         * gradient_in[0, h, w, f]
                     )
@@ -561,8 +565,13 @@ class LayerPooling(Layer):
         self.output_shape = (1, h_out, w_out, self.input_shape[3])
 
     def forward(self, data_in: np.ndarray) -> np.ndarray:
-        data_out, cache = self._forward_pooling_step(data_in)
-        self.cache = cache
+        data_out = self._forward_pooling_step(data_in)
+
+        self.cache = Cache_pooling(
+            data_act=data_in,
+            data_pool=data_out,
+        )
+
         return data_out
 
     def backward(self, gradient_in: np.ndarray) -> np.ndarray:

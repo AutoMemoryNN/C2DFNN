@@ -252,9 +252,14 @@ if __name__ == "__main__":
 
     print(network)
 
+    X_train = np.random.rand(1, 28, 28, 3)  # Shape: (batch, height, width, channels)
+    Y_train = network.one_hot_encode(
+        np.random.randint(0, 10, size=(1,)), num_classes=10
+    )
+
     network.train(
-        X=np.random.rand(100, 1, 28, 28, 1),  # Example input data
-        Y=network.one_hot_encode(np.random.randint(0, 10, size=(100,)), num_classes=10),
+        X=X_train,
+        Y=Y_train,
         cost_function=loss_fn.CATEGORICAL_CROSSENTROPY,
         learning_rate=0.01,
         epochs=50,
