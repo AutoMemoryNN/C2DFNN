@@ -67,6 +67,30 @@ class Network:
             self.parameters[layer.name] = {}
             self.activations[layer.name] = {}
 
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        A = X
+        for layer in self.layers:
+            A = layer.forward(A)
+        return A
+
+    def accuracy(self, X: np.ndarray, Y: np.ndarray) -> float:
+        Yp = self.predict(X)
+        output_activation = self.layers[-1].get_activation_function()
+
+        if output_activation == Activation_fn.SOFTMAX:
+            Yp_labels = np.argmax(Yp, axis=1)
+            Y_true = np.argmax(Y, axis=1)
+        elif output_activation == Activation_fn.SIGMOID:
+            Yp_labels = (Yp > 0.5).astype(int)
+            Y_true = Y.astype(int)
+        else:
+            raise ValueError(
+                f"Accuracy not implemented for activation: {output_activation}"
+            )
+
+        acc = np.mean(Yp_labels == Y_true)
+        return acc
+
     def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn) -> np.ndarray:
         output_layer = self.layers[-1]
         if (
@@ -114,8 +138,8 @@ class Network:
         epochs: int = 50,
         print_cost=False,
         show_graph=False,
-    ):  # user cannot choice the loss function
-        costs = []
+    ):
+        costs = np.ndarray([])
         for epoch in range(epochs):
             # Forward pass
             A = X
@@ -124,7 +148,7 @@ class Network:
                 self.activations[layer.name] = A
             # Compute cost
             cost = self.cost(A, Y, cost_function)
-            costs.append(cost)
+            costs = np.append(costs, cost)
 
             # Backward pass
             dA = self.d_cost(A, Y, cost_function)
@@ -136,8 +160,22 @@ class Network:
             for layer in self.layers:
                 layer.update_parameters(learning_rate)
 
+            if print_cost and epoch % 10 == 0:
+                print(f"Epoch {epoch}, Cost: {np.mean(cost)}")
+            if show_graph and epoch % 10 == 0:
+                self.graph_cost(costs)
+
+    def graph_cost(self, costs: np.ndarray):
+        import matplotlib.pyplot as plt
+
+        plt.plot(costs)
+        plt.xlabel("Epochs")
+        plt.ylabel("Cost")
+        plt.title("Cost over epochs")
+        plt.show()
+
     def one_hot_encode(self, y, num_classes):
-        pass
+        return np.eye(num_classes)[y.astype(int)].reshape(-1, num_classes)
 
 
 if __name__ == "__main__":
@@ -192,5 +230,14 @@ if __name__ == "__main__":
         ),
     ]
 
-    # You can now use layers for further processing
-    # For example: network = Network(LayersConfig(layers))
+    network = Network(LayersConfig(layers))
+
+    network.train(
+        X=np.random.rand(100, 1, 28, 28, 1),  # Example input data
+        Y=network.one_hot_encode(np.random.randint(0, 10, size=(100,)), num_classes=10),
+        cost_function=loss_fn.CATEGORICAL_CROSSENTROPY,
+        learning_rate=0.01,
+        epochs=50,
+        print_cost=True,
+        show_graph=True,
+    )
