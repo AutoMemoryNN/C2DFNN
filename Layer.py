@@ -6,6 +6,7 @@ import numpy as np
 
 class Layers_type(Enum):
     CONVOLUTIONAL = "convolutional"
+    POOLING = "pooling"
     FLATTEN = "flatten"
     DENSE = "dense"
 

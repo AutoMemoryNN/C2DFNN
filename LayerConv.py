@@ -97,6 +97,16 @@ class LayerFlatten(Layer):
 
         return data_out
 
+    def set_input_shape(self, input_shape: tuple[int, int, int, int] | None):
+        if input_shape is None or len(input_shape) != 4:
+            raise ValueError(
+                f"Input shape must be a tuple of 4 integers: (batch_size, height, width, channels), got {input_shape}"
+            )
+        self.input_shape = input_shape
+
+        # Output shape is determined by the flatten operation
+        self.output_shape = self._to_dense(np.zeros(input_shape)).shape
+
     def initialize_parameters(self):
         """
         Initialize parameters for the flatten layer.
@@ -144,6 +154,9 @@ class LayerConv(Layer):
         )
         self.specification = specification
 
+        if input_shape is not None:
+            self.generate_output_shape()
+
         self.parameters = Parameters(
             W=np.ndarray([]),
             b=np.ndarray([]),
@@ -152,6 +165,39 @@ class LayerConv(Layer):
         self.gradient = Gradient(
             dW=np.ndarray([]),
             db=np.ndarray([]),
+        )
+
+    def set_input_shape(self, input_shape: tuple[int, int, int, int] | None):
+        if input_shape is None or len(input_shape) != 4:
+            raise ValueError(
+                f"Input shape must be a tuple of 4 integers: (batch_size, height, width, channels), got {input_shape}"
+            )
+        self.input_shape = input_shape
+
+        self.generate_output_shape()
+
+    def generate_output_shape(self):
+        self.output_shape = (
+            1,  # batch size is always 1 for this implementation
+            int(
+                (
+                    self.input_shape[1]
+                    - self.specification.c_filter
+                    + 2 * self.specification.c_pad
+                )
+                / self.specification.c_stride
+                + 1
+            ),
+            int(
+                (
+                    self.input_shape[2]
+                    - self.specification.c_filter
+                    + 2 * self.specification.c_pad
+                )
+                / self.specification.c_stride
+                + 1
+            ),
+            self.specification.c_filters,
         )
 
     def backward(self, gradient_in: np.ndarray) -> np.ndarray:
@@ -485,7 +531,7 @@ class LayerPooling(Layer):
         name: str | None = None,
     ):
         super().__init__(
-            layer_type=Layers_type.CONVOLUTIONAL,
+            layer_type=Layers_type.POOLING,
             name=name,
         )
         self.cache = Cache_pooling(
@@ -493,6 +539,26 @@ class LayerPooling(Layer):
             data_pool=np.ndarray([]),
         )
         self.specification = specification
+
+    def set_input_shape(self, input_shape: tuple[int, int, int, int] | None):
+        if input_shape is None or len(input_shape) != 4:
+            raise ValueError(
+                f"Input shape must be a tuple of 4 integers: (batch_size, height, width, channels), got {input_shape}"
+            )
+        self.input_shape = input_shape
+        self.generate_output_shape()
+
+    def generate_output_shape(self):
+        if self.input_shape is None:
+            raise ValueError("Input shape must be set before generating output shape")
+
+        h_out = (
+            self.input_shape[1] - self.specification.p_filter
+        ) // self.specification.p_stride + 1
+        w_out = (
+            self.input_shape[2] - self.specification.p_filter
+        ) // self.specification.p_stride + 1
+        self.output_shape = (1, h_out, w_out, self.input_shape[3])
 
     def forward(self, data_in: np.ndarray) -> np.ndarray:
         data_out, cache = self._forward_pooling_step(data_in)

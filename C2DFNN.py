@@ -46,11 +46,13 @@ class Network:
 
             if layer.name is None:
                 if layer.get_layer_type() == Layers_type.CONVOLUTIONAL:
-                    layer.name = f"conv_layer_{i}"
-                elif layer.get_layer_type() == Layers_type.FLATTEN:
-                    layer.name = f"flatter_layer_{i}"
+                    layer.name = f"conv_layer_{i} "
                 elif layer.get_layer_type() == Layers_type.DENSE:
                     layer.name = f"dense_layer_{i}"
+                elif layer.get_layer_type() == Layers_type.FLATTEN:
+                    layer.name = f"flat_layer_{i} "
+                elif layer.get_layer_type() == Layers_type.POOLING:
+                    layer.name = f"pool_layer_{i} "
 
             previous_layer = self.layers[i - 1]
 
@@ -177,6 +179,23 @@ class Network:
     def one_hot_encode(self, y, num_classes):
         return np.eye(num_classes)[y.astype(int)].reshape(-1, num_classes)
 
+    def __repr__(self):
+        summary = ["Network Architecture:"]
+        for i, layer in enumerate(self.layers):
+            name = layer.name
+            layer_type = layer.get_layer_type().name
+            input_shape = layer.get_input_shape()
+            output_shape = layer.get_output_shape()
+            activation = layer.get_activation_function()
+            activation_str = activation.name if activation else "None"
+
+            summary.append(
+                f"  ({i}) {name} | Type: {layer_type} | "
+                f"Input: {input_shape} -> Output: {output_shape} | "
+                f"Activation: {activation_str}"
+            )
+        return "\n".join(summary)
+
 
 if __name__ == "__main__":
 
@@ -196,7 +215,6 @@ if __name__ == "__main__":
             specification=Specification_pooling(
                 p_filter=2, p_stride=2, p_function=Pooling_fn.MAX
             ),
-            name="pooling_layer_interesting",
         ),
         LayerConv(
             input_shape=(1, 26, 26, 32),
@@ -231,6 +249,8 @@ if __name__ == "__main__":
     ]
 
     network = Network(LayersConfig(layers))
+
+    print(network)
 
     network.train(
         X=np.random.rand(100, 1, 28, 28, 1),  # Example input data

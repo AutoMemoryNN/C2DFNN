@@ -34,6 +34,8 @@ class LayerDense(Layer):
             layer_type=Layers_type.DENSE, input_shape=input_shape, name=name
         )
 
+        self.output_shape = output_shape
+
         self.n_neurons_current = None
         self.input_shape = None
         self.n_neurons_post = output_shape[0]
