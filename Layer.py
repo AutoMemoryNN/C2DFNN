@@ -49,12 +49,25 @@ class Layer(ABC):
         return self.layer_type
 
     @abstractmethod
+    def get_parameters(self):
+        raise NotImplementedError("This method should be overridden in subclasses")
+
+    @abstractmethod
+    def get_gradients(self):
+        raise NotImplementedError("This method should be overridden in subclasses")
+
+    @abstractmethod
     def get_activation_function(self) -> Activation_fn | None:
         raise NotImplementedError("This method should be overridden in subclasses")
 
     @abstractmethod
     def initialize_parameters(self):
         # This method should be overridden in subclasses to initialize parameters specific to the layer type
+        raise NotImplementedError("This method should be overridden in subclasses")
+
+    @abstractmethod
+    def update_parameters(self, learning_rate: float):
+        # This method should be overridden in subclasses to update parameters based on gradients
         raise NotImplementedError("This method should be overridden in subclasses")
 
     @abstractmethod

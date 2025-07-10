@@ -210,3 +210,9 @@ class LayerDense(Layer):
 
     def get_activation_function(self) -> Activation_fn:
         return self.activation_fn
+
+    def get_parameters(self):
+        return self.parameters
+
+    def get_gradients(self):
+        return self.gradients

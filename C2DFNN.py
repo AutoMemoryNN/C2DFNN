@@ -67,15 +67,6 @@ class Network:
             self.parameters[layer.name] = {}
             self.activations[layer.name] = {}
 
-    def predict(self, X, parameters, activations):
-        pass
-
-    def accuracy(self, X, Y, parameters, activations):
-        pass
-
-    def load_y_data(self, file_path):
-        pass
-
     def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn) -> np.ndarray:
         output_layer = self.layers[-1]
         if (
@@ -100,18 +91,50 @@ class Network:
                 f"Unsupported cost function or cost functions {costfunction} is not compatible with the output layer's activation function {output_layer.get_activation_function()}."
             )
 
-    def update_parameters(self, parameters, grads, learning_rate):
-        pass
+    def d_cost(
+        self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn
+    ) -> np.ndarray:
+        if costfunction == loss_fn.CATEGORICAL_CROSSENTROPY:
+            return -Y / (Yp + 1e-15)
+        elif costfunction == loss_fn.MEAN_SQUARED_ERROR:
+            return 2 * (Yp - Y) / Y.shape[0]
+        elif costfunction == loss_fn.BINARY_CROSSENTROPY:
+            return -Y / (Yp + 1e-15) + (1 - Y) / (1 - Yp + 1e-15)
+        else:
+            raise ValueError(
+                f"Unsupported cost function: {costfunction}. Supported functions are: {list(loss_fn)}."
+            )
 
     def train(
         self,
-        X,
-        Y,
-        learning_rate,
-        num_iterations,
+        X: np.ndarray,
+        Y: np.ndarray,
+        cost_function: loss_fn,
+        learning_rate: float = 0.01,
+        epochs: int = 50,
         print_cost=False,
+        show_graph=False,
     ):  # user cannot choice the loss function
-        pass
+        costs = []
+        for epoch in range(epochs):
+            # Forward pass
+            A = X
+            for layer in self.layers:
+                A = layer.forward(A)
+                self.activations[layer.name] = A
+            # Compute cost
+            cost = self.cost(A, Y, cost_function)
+            costs.append(cost)
+
+            # Backward pass
+            dA = self.d_cost(A, Y, cost_function)
+            for layer in reversed(self.layers):
+                dA = layer.backward(dA)
+                self.parameters[layer.name] = layer.get_parameters()
+
+            # Update parameters
+            for layer in self.layers:
+                layer.update_parameters(learning_rate)
 
     def one_hot_encode(self, y, num_classes):
         pass

@@ -315,7 +315,7 @@ class LayerDense(Layer):
 
         return grads
 
-    def update_parameters(self, parameters, grads, learning_rate):
+    def update_parameters(self, learning_rate):
         """
         Update parameters
         Arguments:
@@ -324,6 +324,9 @@ class LayerDense(Layer):
         Returns:
         parameters -- parameters "W1", "b1", ..., "WL", "bL" (dictionary)
         """
+        parameters = self.initialize_parameters()
+        grads = np.zeros_like(parameters)
+
         L = len(parameters) // 2  # number of layers in the neural network
 
         for layer_index in range(L):
@@ -368,7 +371,7 @@ class LayerDense(Layer):
                 costs.append(cost_value)
 
             grads = self.backward(AL, Y, caches, activations, cost)
-            parameters = self.update_parameters(parameters, grads, learning_rate)
+            parameters = self.update_parameters(learning_rate)
 
         if graph:
 

@@ -104,6 +104,18 @@ class LayerFlatten(Layer):
         """
         pass
 
+    def get_activation_function(self) -> Activation_fn | None:
+        return None
+
+    def get_parameters(self):
+        return Parameters(W=np.array([]), b=np.array([]))
+
+    def get_gradients(self):
+        return Gradient(dW=np.array([]), db=np.array([]))
+
+    def update_parameters(self, learning_rate: float):
+        pass
+
 
 # TODO: continue form Gradient
 class LayerConv(Layer):
@@ -144,9 +156,6 @@ class LayerConv(Layer):
 
     def backward(self, gradient_in: np.ndarray) -> np.ndarray:
         data_out, gradient = self._backward_convolutional(gradient_in)
-        self._update_parameters(
-            gradient, learning_rate=0.01
-        )  # TODO: Learning rate hardcoded
         return data_out
 
     def initialize_parameters(self):
@@ -442,7 +451,7 @@ class LayerConv(Layer):
 
         return dA_conv, total_gradient
 
-    def _update_parameters(self, gradient: Gradient, learning_rate: float):
+    def update_parameters(self, learning_rate: float):
         """
         Update parameters using gradient descent
         Arguments:
@@ -457,6 +466,12 @@ class LayerConv(Layer):
 
     def get_activation_function(self) -> Activation_fn | None:
         return self.specification.activation
+
+    def get_parameters(self):
+        return self.parameters
+
+    def get_gradients(self):
+        raise NotImplementedError
 
 
 class LayerPooling(Layer):
@@ -604,3 +619,15 @@ class LayerPooling(Layer):
         db = np.array([])
 
         return dZ, Gradient(dW, db)
+
+    def get_activation_function(self) -> Activation_fn | None:
+        return None
+
+    def get_parameters(self):
+        return Parameters(W=np.array([]), b=np.array([]))
+
+    def get_gradients(self):
+        return Gradient(dW=np.array([]), db=np.array([]))
+
+    def update_parameters(self, learning_rate: float):
+        pass
