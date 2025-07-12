@@ -1,8 +1,9 @@
-from dataclasses import dataclass
-from enum import Enum
-
+import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
 
+from tensorflow.keras.datasets import mnist  # type: ignore
+from dataclasses import dataclass
+from enum import Enum
 from Layer import Layer, Layers_type, Activation_fn
 from LayerDense_v2 import LayerDense
 from LayerConv import (
@@ -99,7 +100,8 @@ class Network:
             costfunction == loss_fn.CATEGORICAL_CROSSENTROPY
             and output_layer.get_activation_function() == Activation_fn.SOFTMAX
         ):
-            return -np.sum(Y * np.log(Yp + 1e-15), axis=1)
+            # Protetion against log(0)
+            return Yp - Y
         elif (
             costfunction == loss_fn.MEAN_SQUARED_ERROR
             and output_layer.get_activation_function() == Activation_fn.RELU
@@ -141,34 +143,47 @@ class Network:
         print_cost=False,
         show_graph=False,
     ):
-        costs = np.ndarray([])
+        costs = []
+
         for epoch in range(epochs):
-            # Forward pass
-            A = X
-            for layer in self.layers:
-                A = layer.forward(A)
-                self.activations[layer.name] = A
-            # Compute cost
-            cost = self.cost(A, Y, cost_function)
-            costs = np.append(costs, cost)
+            epoch_costs = []
 
-            # Backward pass
-            dA = self.d_cost(A, Y, cost_function)
-            for layer in reversed(self.layers):
-                dA = layer.backward(dA)
-                self.parameters[layer.name] = layer.get_parameters()
+            for i in range(X.shape[0]):
+                x = X[i : i + 1]  # batch size of 1
+                y = Y[i : i + 1]
 
-            # Update parameters
-            for layer in self.layers:
-                layer.update_parameters(learning_rate)
+                # Forward pass
+                A = x
+                for layer in self.layers:
+                    A = layer.forward(A)
+                    self.activations[layer.name] = A
+
+                # Cost
+                cost = self.cost(A, y, cost_function)
+                epoch_costs.append(cost)
+
+                # Backward
+                dA = self.d_cost(A, y, cost_function)
+                for layer in reversed(self.layers):
+                    dA = layer.backward(dA)
+                    self.parameters[layer.name] = layer.get_parameters()
+
+                # Update
+                for layer in self.layers:
+                    layer.update_parameters(learning_rate)
+
+                if i % 100 == 0 and print_cost:
+                    print(f"Epoch {epoch}, Sample {i}, Cost: {np.mean(cost)}")
+
+            mean_cost = np.mean(epoch_costs)
+            costs.append(mean_cost)
 
             if print_cost and epoch % 10 == 0:
-                print(f"Epoch {epoch}, Cost: {np.mean(cost)}")
+                print(f"Epoch {epoch}, Cost: {mean_cost}")
             if show_graph and epoch % 10 == 0:
-                self.graph_cost(costs)
+                self.graph_cost(np.array(costs))
 
     def graph_cost(self, costs: np.ndarray):
-        import matplotlib.pyplot as plt
 
         plt.plot(costs)
         plt.xlabel("Epochs")
@@ -199,30 +214,32 @@ class Network:
 
 if __name__ == "__main__":
 
+    # Cargar y preprocesar MNIST
+    (X_train, y_train), (_, _) = mnist.load_data()
+    X_train = X_train
+    y_train = y_train
+
+    # Normalizar y agregar canal
+    X_train = X_train.astype(np.float64) / 255.0
+    X_train = X_train.reshape(-1, 28, 28, 1)  # (batch, 28, 28, 1)
+
+    print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+
+    # One-hot encode
+    network = Network(
+        LayersConfig([])
+    )  # temp instantiation just to access one_hot_encode
+    Y_train = network.one_hot_encode(y_train, num_classes=10)
+
+    # Crear red
     layers = [
         LayerConv(
             input_shape=(1, 28, 28, 1),
             specification=Specification_conv(
-                c_filter=3,
+                c_filter=4,
                 c_channels=1,
-                c_filters=32,
-                c_stride=1,
-                c_pad=0,
-                activation=Activation_fn.RELU,
-            ),
-        ),
-        LayerPooling(
-            specification=Specification_pooling(
-                p_filter=2, p_stride=2, p_function=Pooling_fn.MAX
-            ),
-        ),
-        LayerConv(
-            input_shape=(1, 26, 26, 32),
-            specification=Specification_conv(
-                c_filter=3,
-                c_channels=32,
-                c_filters=64,
-                c_stride=1,
+                c_filters=4,
+                c_stride=2,
                 c_pad=0,
                 activation=Activation_fn.RELU,
             ),
@@ -233,36 +250,20 @@ if __name__ == "__main__":
             ),
         ),
         LayerFlatten(),
-        LayerDense(
-            (128,),
-            Activation_fn.RELU,
-        ),
-        LayerDense(
-            (64,),
-            Activation_fn.RELU,
-        ),
-        LayerDense(
-            (10,),
-            Activation_fn.SOFTMAX,
-            name="output_layer",
-        ),
+        LayerDense((16,), Activation_fn.RELU),
+        LayerDense((10,), Activation_fn.SOFTMAX, name="output_layer"),
     ]
 
     network = Network(LayersConfig(layers))
 
     print(network)
 
-    X_train = np.random.rand(1, 28, 28, 3)  # Shape: (batch, height, width, channels)
-    Y_train = network.one_hot_encode(
-        np.random.randint(0, 10, size=(1,)), num_classes=10
-    )
-
     network.train(
         X=X_train,
         Y=Y_train,
         cost_function=loss_fn.CATEGORICAL_CROSSENTROPY,
-        learning_rate=0.01,
-        epochs=50,
+        learning_rate=0.00001,
+        epochs=10,
         print_cost=True,
-        show_graph=True,
+        show_graph=False,
     )

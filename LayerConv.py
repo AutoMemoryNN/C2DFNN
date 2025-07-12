@@ -207,14 +207,10 @@ class LayerConv(Layer):
         return data_out
 
     def initialize_parameters(self):
-        """
-        Initialize parameters for the convolutional layer.
-        W: (c_filter, c_filter, c_channels, c_filters)
-        b: (1, 1, 1, c_filters)
-        """
         filter_size = self.specification.c_filter
         n_channels = self.specification.c_channels
         n_filters = self.specification.c_filters
+        activation = self.specification.activation
 
         W_shape = (
             filter_size,
@@ -223,10 +219,19 @@ class LayerConv(Layer):
             n_filters,
         )
 
-        self.parameters.W = np.random.randn(*W_shape) * 0.01
+        fan_in = filter_size * filter_size * n_channels
+
+        # This Due a instability in the training process, numeric overflow
+        if activation == Activation_fn.RELU:
+            scale = np.sqrt(2.0 / fan_in)  # He
+        elif activation in {Activation_fn.SIGMOID, Activation_fn.TANH}:
+            scale = np.sqrt(1.0 / fan_in)  # Xavier
+        else:
+            scale = 0.01
+
+        self.parameters.W = np.random.randn(*W_shape) * scale
         self.parameters.b = np.zeros((1, 1, 1, n_filters))
 
-        # for gradients
         self.gradient.dW = np.zeros_like(self.parameters.W, dtype=np.float64)
         self.gradient.db = np.zeros_like(self.parameters.b, dtype=np.float64)
 

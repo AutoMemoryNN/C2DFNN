@@ -65,8 +65,17 @@ class LayerDense(Layer):
             raise ValueError("Call set_input_shape() first.")
         _, n_in = self.input_shape
         n_out = self.output_shape[1]  # output_shape (1, n_neurons_post)
+
+        # This Due a instability in the training process, numeric overflow
+        if self.activation_fn == Activation_fn.RELU:
+            scale = np.sqrt(2.0 / n_in)  # He
+        elif self.activation_fn in {Activation_fn.SIGMOID, Activation_fn.TANH}:
+            scale = np.sqrt(1.0 / n_in)  # Xavier
+        else:
+            scale = 0.01
+
         self.parameters = Parameters_dense(
-            weights=np.random.randn(n_in, n_out) * 0.01,
+            weights=np.random.randn(n_in, n_out) * scale,
             biases=np.zeros((1, n_out)),
         )
         self.gradients = Gradients_dense(
