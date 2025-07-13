@@ -95,28 +95,31 @@ class Network:
         return acc
 
     def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn) -> np.ndarray:
-        output_layer = self.layers[-1]
+        output_activation = self.layers[-1].get_activation_function()
+
+        # clipped values to avoid log(0)
         if (
             costfunction == loss_fn.CATEGORICAL_CROSSENTROPY
-            and output_layer.get_activation_function() == Activation_fn.SOFTMAX
+            and output_activation == Activation_fn.SOFTMAX
         ):
-            # Protetion against log(0)
-            return Yp - Y
+            Yp_clipped = np.clip(Yp, 1e-15, 1 - 1e-15)
+            return -np.sum(Y * np.log(Yp_clipped), axis=1)
         elif (
             costfunction == loss_fn.MEAN_SQUARED_ERROR
-            and output_layer.get_activation_function() == Activation_fn.RELU
+            and output_activation == Activation_fn.RELU
         ):
             return np.mean(np.square(Y - Yp), axis=1)
         elif (
             costfunction == loss_fn.BINARY_CROSSENTROPY
-            and output_layer.get_activation_function() == Activation_fn.SIGMOID
+            and output_activation == Activation_fn.SIGMOID
         ):
+            Yp_clipped = np.clip(Yp, 1e-15, 1 - 1e-15)
             return -np.mean(
-                Y * np.log(Yp + 1e-15) + (1 - Y) * np.log(1 - Yp + 1e-15), axis=1
+                Y * np.log(Yp_clipped) + (1 - Y) * np.log(1 - Yp_clipped), axis=1
             )
         else:
             raise ValueError(
-                f"Unsupported cost function or cost functions {costfunction} is not compatible with the output layer's activation function {output_layer.get_activation_function()}."
+                f"Unsupported cost {costfunction} for activation {output_activation}."
             )
 
     def d_cost(
@@ -140,6 +143,7 @@ class Network:
         cost_function: loss_fn,
         learning_rate: float = 0.01,
         epochs: int = 50,
+        batch_size: int = 16,
         print_cost=False,
         show_graph=False,
     ):
@@ -148,22 +152,22 @@ class Network:
         for epoch in range(epochs):
             epoch_costs = []
 
-            for i in range(X.shape[0]):
-                x = X[i : i + 1]  # batch size of 1
-                y = Y[i : i + 1]
+            for i in range((X.shape[0] + batch_size - 1) // batch_size):
+                x = X[i * batch_size : (i + 1) * batch_size]
+                y = Y[i * batch_size : (i + 1) * batch_size]
 
                 # Forward pass
-                A = x
+                Z = x
                 for layer in self.layers:
-                    A = layer.forward(A)
-                    self.activations[layer.name] = A
+                    Z = layer.forward(Z)
+                    self.activations[layer.name] = Z
 
                 # Cost
-                cost = self.cost(A, y, cost_function)
+                cost = self.cost(Z, y, cost_function)
                 epoch_costs.append(cost)
 
                 # Backward
-                dA = self.d_cost(A, y, cost_function)
+                dA = self.d_cost(Z, y, cost_function)
                 for layer in reversed(self.layers):
                     dA = layer.backward(dA)
                     self.parameters[layer.name] = layer.get_parameters()

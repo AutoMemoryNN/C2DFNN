@@ -153,6 +153,7 @@ class LayerConv(Layer):
             data_act=np.ndarray([]),
         )
         self.specification = specification
+        self.batch_size = 0
 
         if input_shape is not None:
             self.generate_output_shape()
@@ -273,8 +274,6 @@ class LayerConv(Layer):
     def _forward_convolution_step(
         self,
         data_in: np.ndarray,
-        specification: Specification_conv,
-        parameters: Parameters,
     ) -> np.ndarray:
         """
         Do a forward convolution step
@@ -286,38 +285,37 @@ class LayerConv(Layer):
         data_out
         """
 
-        padding = specification.c_pad
-        stride = specification.c_stride
-        filter_size = specification.c_filter
-        n_filters = specification.c_filters
+        padding = self.specification.c_pad
+        stride = self.specification.c_stride
+        filter_size = self.specification.c_filter
+        n_filters = self.specification.c_filters
 
         Xp = self._add_pad(data_in, padding)
 
-        _, h_in, w_in, n_channels = Xp.shape
+        batch_size, h_in, w_in, n_channels = Xp.shape
 
         h_out = int((h_in - filter_size) // stride + 1)
         w_out = int((w_in - filter_size) // stride + 1)
 
-        data_out = np.zeros((1, h_out, w_out, n_filters))
+        data_out = np.zeros((batch_size, h_out, w_out, n_filters))
 
-        for h in range(h_out):
-            for w in range(w_out):
-                for f in range(n_filters):
-                    h_start = h * stride
-                    h_end = h_start + filter_size
-                    w_start = w * stride
-                    w_end = w_start + filter_size
+        for b in range(batch_size):
+            for h in range(h_out):
+                for w in range(w_out):
+                    for f in range(n_filters):
+                        h_start = h * stride
+                        h_end = h_start + filter_size
+                        w_start = w * stride
+                        w_end = w_start + filter_size
 
-                    X_slice = Xp[0, h_start:h_end, w_start:w_end, :]
+                        X_slice = Xp[b, h_start:h_end, w_start:w_end, :]
 
-                    X_slice_adjusted = X_slice[:, :, 0 : specification.c_channels]
+                        W_slice = self.parameters.W[:, :, :, f]
+                        b_slice = self.parameters.b[0, 0, 0, f]
 
-                    W_slice = parameters.W[:, :, :, f]
-                    b_slice = parameters.b[0, 0, 0, f]
-
-                    data_out[0, h, w, f] = self._one_convolution(
-                        X_slice_adjusted, W_slice, b_slice
-                    )
+                        data_out[b, h, w, f] = self._one_convolution(
+                            X_slice, W_slice, b_slice
+                        )
 
         return data_out
 
@@ -366,6 +364,8 @@ class LayerConv(Layer):
                 f"Expected data_in to have 4 dimensions, got {data_in.ndim}"
             )
 
+        self.batch_size = data_in.shape[0]
+
         # Check if parameters shape matches specification
         expected_w_shape = (
             self.specification.c_filter,
@@ -378,9 +378,7 @@ class LayerConv(Layer):
                 f"Parameters W shape {self.parameters.W.shape} doesn't match expected {expected_w_shape}"
             )
 
-        data_conv = self._forward_convolution_step(
-            data_in, self.specification, self.parameters
-        )
+        data_conv = self._forward_convolution_step(data_in)
 
         data_act = self._forward_activation_step(data_conv, self.specification)
 
@@ -603,32 +601,30 @@ class LayerPooling(Layer):
         stride = self.specification.p_stride
         filter_size = self.specification.p_filter
 
-        n_filters = data_in.shape[-1]
-        h_in, w_in = data_in.shape[1:3]
+        batch_size, h_in, w_in, n_filters = data_in.shape
 
         h_out = (h_in - filter_size) // stride + 1
         w_out = (w_in - filter_size) // stride + 1
 
-        data_out = np.zeros((1, h_out, w_out, n_filters))
+        data_out = np.zeros((batch_size, h_out, w_out, n_filters))
 
-        for f in range(n_filters):
+        for b in range(batch_size):
             for h in range(h_out):
                 for w in range(w_out):
-                    h_start = h * stride
-                    h_end = h_start + filter_size
-                    w_start = w * stride
-                    w_end = w_start + filter_size
+                    for f in range(n_filters):
+                        h_start = h * stride
+                        h_end = h_start + filter_size
+                        w_start = w * stride
+                        w_end = w_start + filter_size
 
-                    X_slice = data_in[
-                        0, h_start:h_end, w_start:w_end, f
-                    ]  # assuming batch size of 1
+                        X_slice = data_in[b, h_start:h_end, w_start:w_end, f]
 
-                    if fnc == Pooling_fn.MAX:
-                        data_out[0, h, w, f] = np.max(X_slice)
-                    elif fnc == Pooling_fn.AVERAGE:
-                        data_out[0, h, w, f] = np.mean(X_slice)
-                    else:
-                        raise ValueError(f"Unsupported pooling function: {fnc}")
+                        if fnc == Pooling_fn.MAX:
+                            data_out[b, h, w, f] = np.max(X_slice)
+                        elif fnc == Pooling_fn.AVERAGE:
+                            data_out[b, h, w, f] = np.mean(X_slice)
+                        else:
+                            raise ValueError(f"Unsupported pooling function: {fnc}")
 
         return data_out
 

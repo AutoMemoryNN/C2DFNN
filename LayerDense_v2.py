@@ -42,6 +42,7 @@ class LayerDense(Layer):
         self.n_neurons_current = None
         self.input_shape = None
         self.n_neurons_post = output_shape[0]
+        self.batch_size = 0
 
         self.parameters = Parameters_dense(
             weights=np.array([]),
@@ -103,7 +104,7 @@ class LayerDense(Layer):
         b = self.parameters.biases
         Z_prev = data_in
 
-        A_current = Z_prev @ W + b  # shape (n_samples, n_neurons_post)
+        A_current = Z_prev @ W + b  # shape (batch_size, n_neurons_post)
 
         activation = self.activation_fn
         Z_current = None
@@ -123,11 +124,7 @@ class LayerDense(Layer):
         return Z_current
 
     def forward(self, data_in: np.ndarray) -> np.ndarray:
-        # (n_features,) o (batch, n_features)
-        if data_in.ndim == 1:
-            data_in = data_in.reshape(1, -1)  # batch 1
-        if data_in.ndim != 2:
-            raise ValueError("Expected 1D or 2D input, got shape " + str(data_in.shape))
+        self.batch_size = data_in.shape[0]
 
         batch_size, n_in = data_in.shape
         if n_in != self.n_neurons_current:
