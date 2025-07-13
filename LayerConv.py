@@ -203,10 +203,6 @@ class LayerConv(Layer):
             self.specification.c_filters,
         )
 
-    def backward(self, gradient_in: np.ndarray) -> np.ndarray:
-        data_out, gradient = self._backward_convolutional(gradient_in)
-        return data_out
-
     def initialize_parameters(self):
         filter_size = self.specification.c_filter
         n_channels = self.specification.c_channels
@@ -390,6 +386,11 @@ class LayerConv(Layer):
 
         return data_act
 
+    def backward(self, gradient_in: np.ndarray) -> np.ndarray:
+        data_out, gradient = self._backward_convolutional(gradient_in)
+        self.gradient = gradient  # bug FIXED!!
+        return data_out
+
     def _backward_activation_step(self, gradient_in):
         """
         Do a backward activation step
@@ -433,7 +434,7 @@ class LayerConv(Layer):
         pad = self.specification.c_pad
 
         # Get dimensions
-        m, h_out, w_out, n_f = gradient_in.shape
+        batch_size, h_out, w_out, n_f = gradient_in.shape
 
         # Add padding to input data for gradient computation
         data_in_padded = self._add_pad(self.cache.data_in, pad)
@@ -447,35 +448,32 @@ class LayerConv(Layer):
         gradient_in = gradient_in.astype(np.float64)
 
         # Compute gradients
-        for h in range(h_out):
-            for w in range(w_out):
-                for f in range(n_f):
-                    # Define slice boundaries
-                    h_start = h * stride
-                    h_end = h_start + filter_size
-                    w_start = w * stride
-                    w_end = w_start + filter_size
 
-                    # Extract slice from padded input and ensure float type
-                    a_slice = data_in_padded[0, h_start:h_end, w_start:w_end, :].astype(
-                        np.float64
-                    )
+        for b in range(batch_size):
+            for h in range(h_out):
+                for w in range(w_out):
+                    for f in range(n_f):
+                        # Define slice boundaries
+                        h_start = h * stride
+                        h_end = h_start + filter_size
+                        w_start = w * stride
+                        w_end = w_start + filter_size
 
-                    # FIX: Make sure we only use the channels that match the filter
-                    # The filter expects c_channels, so slice accordingly
-                    n_channels = self.specification.c_channels
-                    a_slice_corrected = a_slice[:, :, :n_channels]
+                        # Extract slice from padded input and ensure float type
+                        a_slice = data_in_padded[
+                            b, h_start:h_end, w_start:w_end, :
+                        ].astype(np.float64)
 
-                    # Update gradients
-                    dW[:, :, :, f] += a_slice_corrected * gradient_in[0, h, w, f]
-                    db[0, 0, 0, f] += gradient_in[0, h, w, f]
+                        # Update gradients
+                        dW[:, :, :, f] += a_slice * gradient_in[b, h, w, f]
+                        db[0, 0, 0, f] += gradient_in[b, h, w, f]
 
-                    # Update gradient w.r.t. input
-                    # Only propagate to the channels that were actually used
-                    dA_prev[0, h_start:h_end, w_start:w_end, :n_channels] += (
-                        self.parameters.W[:, :, :, f].astype(np.float64)
-                        * gradient_in[0, h, w, f]
-                    )
+                        # Update gradient w.r.t. input
+                        # Only propagate to the channels that were actually used
+                        dA_prev[b, h_start:h_end, w_start:w_end, :n_f] += (
+                            self.parameters.W[:, :, :, f].astype(np.float64)
+                            * gradient_in[b, h, w, f]
+                        )
 
         # Remove padding from input gradients if padding was applied
         if pad > 0:
@@ -648,47 +646,52 @@ class LayerPooling(Layer):
         dZ = np.zeros_like(data_post_act)
 
         # Get dimensions from gradient_in (pooled output), not from dZ
-        _, h_grad, w_grad, n_filters = gradient_in.shape
+        batch_size, h_grad, w_grad, n_filters = gradient_in.shape
 
         pool_size = self.specification.p_filter
         stride = self.specification.p_stride
 
-        for p in range(h_grad):
-            for q in range(w_grad):
-                for current_filter in range(n_filters):
-                    h_start = p * stride
-                    h_end = h_start + pool_size
-                    w_start = q * stride
-                    w_end = w_start + pool_size
+        for b in range(batch_size):
+            for p in range(h_grad):
+                for q in range(w_grad):
+                    for current_filter in range(n_filters):
+                        h_start = p * stride
+                        h_end = h_start + pool_size
+                        w_start = q * stride
+                        w_end = w_start + pool_size
 
-                    # Ensure we don't go out of bounds
-                    h_end = min(h_end, data_post_act.shape[1])
-                    w_end = min(w_end, data_post_act.shape[2])
+                        # Ensure we don't go out of bounds
+                        h_end = min(h_end, data_post_act.shape[1])
+                        w_end = min(w_end, data_post_act.shape[2])
 
-                    # Window
-                    window = data_post_act[
-                        0, h_start:h_end, w_start:w_end, current_filter
-                    ]
+                        # Window
+                        window = data_post_act[
+                            b, h_start:h_end, w_start:w_end, current_filter
+                        ]
 
-                    if window.size == 0:  # Skip empty windows
-                        continue
+                        if window.size == 0:  # Skip empty windows
+                            continue
 
-                    if self.specification.p_function == Pooling_fn.MAX:
-                        idx = np.unravel_index(np.argmax(window), window.shape)
-                        i_max, j_max = idx
+                        if self.specification.p_function == Pooling_fn.MAX:
+                            idx = np.unravel_index(np.argmax(window), window.shape)
+                            i_max, j_max = idx
 
-                        dZ[
-                            0, h_start + i_max, w_start + j_max, current_filter
-                        ] += gradient_in[0, p, q, current_filter]
+                            dZ[
+                                b, h_start + i_max, w_start + j_max, current_filter
+                            ] += gradient_in[b, p, q, current_filter]
 
-                    elif self.specification.p_function == Pooling_fn.AVERAGE:
-                        avg_grad = gradient_in[0, p, q, current_filter] / window.size
-                        dZ[0, h_start:h_end, w_start:w_end, current_filter] += avg_grad
+                        elif self.specification.p_function == Pooling_fn.AVERAGE:
+                            avg_grad = (
+                                gradient_in[b, p, q, current_filter] / window.size
+                            )
+                            dZ[
+                                b, h_start:h_end, w_start:w_end, current_filter
+                            ] += avg_grad
 
-                    else:
-                        raise ValueError(
-                            f"Unsupported pooling function: {self.specification.p_function}"
-                        )
+                        else:
+                            raise ValueError(
+                                f"Unsupported pooling function: {self.specification.p_function}"
+                            )
 
         # Pooling has no parameters
         dW = np.array([])

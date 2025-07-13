@@ -126,11 +126,12 @@ class Network:
         self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn
     ) -> np.ndarray:
         if costfunction == loss_fn.CATEGORICAL_CROSSENTROPY:
-            return -Y / (Yp + 1e-15)
+            return Yp - Y
         elif costfunction == loss_fn.MEAN_SQUARED_ERROR:
             return 2 * (Yp - Y) / Y.shape[0]
         elif costfunction == loss_fn.BINARY_CROSSENTROPY:
-            return -Y / (Yp + 1e-15) + (1 - Y) / (1 - Yp + 1e-15)
+            Yp_clipped = np.clip(Yp, 1e-15, 1 - 1e-15)
+            return -Y / Yp_clipped + (1 - Y) / (1 - Yp_clipped)
         else:
             raise ValueError(
                 f"Unsupported cost function: {costfunction}. Supported functions are: {list(loss_fn)}."
@@ -176,7 +177,7 @@ class Network:
                 for layer in self.layers:
                     layer.update_parameters(learning_rate)
 
-                if i % 100 == 0 and print_cost:
+                if i % 10 == 0 and print_cost:
                     print(f"Epoch {epoch}, Sample {i}, Cost: {np.mean(cost)}")
 
             mean_cost = np.mean(epoch_costs)
@@ -266,7 +267,7 @@ if __name__ == "__main__":
         X=X_train,
         Y=Y_train,
         cost_function=loss_fn.CATEGORICAL_CROSSENTROPY,
-        learning_rate=0.00001,
+        learning_rate=0.001,
         epochs=10,
         print_cost=True,
         show_graph=False,

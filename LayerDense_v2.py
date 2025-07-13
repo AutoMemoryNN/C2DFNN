@@ -173,7 +173,7 @@ class LayerDense(Layer):
         dA = dZ_current * dg  # regla de la cadena dz = dl/dZ * dg/dA
 
         dW = Z_prev.T @ dA / m  # (n_in, m) @ (m, n_out) = (n_in, n_out)
-        db = np.sum(dA, axis=0, keepdims=True) / m  # shape: (1, n_out)
+        db = np.sum(dA, axis=0, keepdims=True) / m  # shape: (m, n_out)
         dA_prev = (
             dA @ self.parameters.weights.T
         )  # (m, n_out) @ (n_out, n_in) = (m, n_in)
@@ -187,9 +187,10 @@ class LayerDense(Layer):
         if not self.already_forwarded:
             raise ValueError("Forward pass must be called before backward step.")
 
-        if gradient_in.ndim == 1:
-            gradient_in = gradient_in.reshape(1, -1)
-        # batch 1 (batch, n_neurons)
+        if gradient_in.ndim != 2 or gradient_in.shape[0] != self.batch_size:
+            raise ValueError(
+                f"Expected shape ({self.batch_size}, n), got {gradient_in.shape}"
+            )
 
         dZ_prev, gradients = self.backward_step(gradient_in)
         self.gradients = gradients
