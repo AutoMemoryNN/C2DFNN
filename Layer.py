@@ -18,6 +18,23 @@ class ACTIVATION_FN(Enum):
     SOFTMAX = "softmax"
 
 
+class OPTIMIZER(Enum):
+    NO_OPTIMIZER = "no_optimizer"
+    MOMENTUM = "momentum"
+
+
+@dataclass
+class OptimizerConfig:
+    learning_rate: float
+    type: OPTIMIZER = OPTIMIZER.NO_OPTIMIZER
+
+
+@dataclass
+class MomentumConfig(OptimizerConfig):
+    momentum: float = 0.9
+    type: OPTIMIZER = OPTIMIZER.MOMENTUM
+
+
 class Layer(ABC):
     def __init__(
         self,
@@ -67,7 +84,9 @@ class Layer(ABC):
         raise NotImplementedError("This method should be overridden in subclasses")
 
     @abstractmethod
-    def update_parameters(self, learning_rate: float):
+    def update_parameters(
+        self, optimizerConfig: OptimizerConfig | MomentumConfig
+    ):  # TODO: This is not scalable, IMPORTANT to change
         # This method should be overridden in subclasses to update parameters based on gradients
         raise NotImplementedError("This method should be overridden in subclasses")
 

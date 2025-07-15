@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import numpy as np
-from Layer import Layer, LAYER_TYPE, ACTIVATION_FN
+from Layer import Layer, LAYER_TYPE, ACTIVATION_FN, MomentumConfig, OptimizerConfig
 
 
 @dataclass
@@ -200,28 +200,43 @@ class LayerDense(Layer):
 
         return dZ_prev
 
-    def update_parameters(self, learning_rate: float):
+    def update_parameters(self, optimizerConfig: OptimizerConfig | MomentumConfig):
         if not self.is_initialized:
             raise ValueError("Parameters must be initialized before updating.")
 
         if not self.already_backwarded:
             raise ValueError("Backward pass must be called before updating parameters.")
 
-        W = self.parameters.weights
-        b = self.parameters.biases
+        if isinstance(optimizerConfig, OptimizerConfig):
+            self.parameters.weights -= (
+                optimizerConfig.learning_rate * self.gradients.g_weights
+            )
+            self.parameters.biases -= (
+                optimizerConfig.learning_rate * self.gradients.g_biases
+            )
+        elif isinstance(optimizerConfig, MomentumConfig):
+            if self.vW is None:
+                self.vW = np.zeros_like(self.parameters.W)
+            if self.vb is None:
+                self.vb = np.zeros_like(self.parameters.b)
 
-        gW = self.gradients.g_weights
-        gb = self.gradients.g_biases
-
-        # Update weights and biases with momentum
-        W -= learning_rate * gW
-        b -= learning_rate * gb
-
-        # Update parameters
-        self.parameters.weights = W
-        self.parameters.biases = b
+            self.vW = (
+                optimizerConfig.momentum * self.vW
+                - optimizerConfig.learning_rate * self.gradient.dW
+            )
+            self.vb = (
+                optimizerConfig.momentum * self.vb
+                - optimizerConfig.learning_rate * self.gradient.db
+            )
+            self.parameters.W += self.vW
+            self.parameters.b += self.vb
+        else:
+            raise ValueError(
+                f"Unsupported optimizerConfig type: {type(optimizerConfig)}. Expected OptimizerConfig or MomentumConfig."
+            )
 
         self.already_backwarded = False
+        return self.parameters
 
     def get_activation_function(self) -> ACTIVATION_FN:
         return self.activation_fn

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Layer import Layer, LAYER_TYPE
+from Layer import Layer, LAYER_TYPE, MomentumConfig, OptimizerConfig
 
 
 class LayerDense(Layer):
@@ -315,7 +315,7 @@ class LayerDense(Layer):
 
         return grads
 
-    def update_parameters(self, learning_rate):
+    def update_parameters(self, optimizerConfig: OptimizerConfig | MomentumConfig):
         """
         Update parameters
         Arguments:
@@ -332,11 +332,11 @@ class LayerDense(Layer):
         for layer_index in range(L):
             parameters["W" + str(layer_index + 1)] = (
                 parameters["W" + str(layer_index + 1)]
-                - learning_rate * grads["dW" + str(layer_index + 1)]
+                - optimizerConfig.learning_rate * grads["dW" + str(layer_index + 1)]
             )
             parameters["b" + str(layer_index + 1)] = (
                 parameters["b" + str(layer_index + 1)]
-                - learning_rate * grads["db" + str(layer_index + 1)]
+                - optimizerConfig.learning_rate * grads["db" + str(layer_index + 1)]
             )
 
         return parameters

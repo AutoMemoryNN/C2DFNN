@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.keras.datasets import mnist  # type: ignore
 from dataclasses import dataclass
 from enum import Enum
-from Layer import Layer, LAYER_TYPE, ACTIVATION_FN
+from Layer import Layer, LAYER_TYPE, ACTIVATION_FN, OptimizerConfig, MomentumConfig
 from LayerDense_v2 import LayerDense
 from LayerConv import (
     LayerConv,
@@ -20,10 +20,6 @@ class LOSS_FN(Enum):
     CATEGORICAL_CROSSENTROPY = "categorical_crossentropy"
     MEAN_SQUARED_ERROR = "mse"
     BINARY_CROSSENTROPY = "binary_crossentropy"
-
-
-class OPTIMIZER(Enum):
-    MOMENTUM = "momentum"
 
 
 @dataclass
@@ -146,7 +142,7 @@ class Network:
         X: np.ndarray,
         Y: np.ndarray,
         cost_function: LOSS_FN,
-        learning_rate: float = 0.01,
+        optimizerConfig: OptimizerConfig = OptimizerConfig(learning_rate=0.001),
         epochs: int = 50,
         batch_size: int = 16,
         print_cost=False,
@@ -179,7 +175,7 @@ class Network:
 
                 # Update
                 for layer in self.layers:
-                    layer.update_parameters(learning_rate)
+                    layer.update_parameters(optimizerConfig=optimizerConfig)
 
                 if i % 10 == 0 and print_cost:
                     print(f"Epoch {epoch}, Sample {i}, Cost: {np.mean(cost)}")
@@ -271,7 +267,7 @@ if __name__ == "__main__":
         X=X_train,
         Y=Y_train,
         cost_function=LOSS_FN.CATEGORICAL_CROSSENTROPY,
-        learning_rate=0.001,
+        optimizerConfig=MomentumConfig(learning_rate=0.01, momentum=0.9),
         epochs=10,
         print_cost=True,
         show_graph=False,

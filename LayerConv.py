@@ -3,7 +3,14 @@ from enum import Enum
 from typing import Tuple
 import numpy as np
 
-from Layer import Layer, LAYER_TYPE, ACTIVATION_FN
+from Layer import (
+    OPTIMIZER,
+    Layer,
+    LAYER_TYPE,
+    ACTIVATION_FN,
+    MomentumConfig,
+    OptimizerConfig,
+)
 
 
 class POOLING_FN(Enum):
@@ -123,7 +130,7 @@ class LayerFlatten(Layer):
     def get_gradients(self):
         return Gradient(dW=np.array([]), db=np.array([]))
 
-    def update_parameters(self, learning_rate: float):
+    def update_parameters(self, optimizerConfig: OptimizerConfig | MomentumConfig):
         pass
 
 
@@ -501,7 +508,7 @@ class LayerConv(Layer):
 
         return dA_conv, total_gradient
 
-    def update_parameters(self, learning_rate: float):
+    def update_parameters(self, optimizerConfig: OptimizerConfig | MomentumConfig):
         """
         Update parameters using gradient descent
         Arguments:
@@ -511,8 +518,31 @@ class LayerConv(Layer):
         Returns:
         updated_parameters -- updated parameters after applying the gradients
         """
-        self.parameters.W -= learning_rate * self.gradient.dW
-        self.parameters.b -= learning_rate * self.gradient.db
+
+        if isinstance(optimizerConfig, OptimizerConfig):
+            self.parameters.W -= optimizerConfig.learning_rate * self.gradient.dW
+            self.parameters.b -= optimizerConfig.learning_rate * self.gradient.db
+        elif isinstance(optimizerConfig, MomentumConfig):
+            if self.vW is None:
+                self.vW = np.zeros_like(self.parameters.weights)
+            if self.vb is None:
+                self.vb = np.zeros_like(self.parameters.biases)
+
+            self.vW = (
+                optimizerConfig.momentum * self.vW
+                - optimizerConfig.learning_rate * self.gradients.g_weights
+            )
+            self.vb = (
+                optimizerConfig.momentum * self.vb
+                - optimizerConfig.learning_rate * self.gradients.g_biases
+            )
+
+            self.parameters.weights += self.vW
+            self.parameters.biases += self.vb
+        else:
+            raise ValueError(
+                f"Unsupported optimizerConfig type: {type(optimizerConfig)}. Expected OptimizerConfig or MomentumConfig."
+            )
 
     def get_activation_function(self) -> ACTIVATION_FN | None:
         return self.specification.activation
@@ -707,5 +737,5 @@ class LayerPooling(Layer):
     def get_gradients(self):
         return Gradient(dW=np.array([]), db=np.array([]))
 
-    def update_parameters(self, learning_rate: float):
+    def update_parameters(self, optimizerConfig: OptimizerConfig | MomentumConfig):
         pass
