@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Tuple
+from typing import Tuple
 import numpy as np
 
-from Layer import Layer, Layers_type, Activation_fn
+from Layer import Layer, LAYER_TYPE, ACTIVATION_FN
 
 
-class Pooling_fn(Enum):
+class POOLING_FN(Enum):
     MAX = "max"
     AVERAGE = "average"
 
@@ -18,14 +18,14 @@ class Specification_conv:
     c_filters: int
     c_stride: int
     c_pad: int
-    activation: Activation_fn
+    activation: ACTIVATION_FN
 
 
 @dataclass
 class Specification_pooling:
     p_filter: int
     p_stride: int
-    p_function: Pooling_fn
+    p_function: POOLING_FN
 
 
 @dataclass
@@ -60,7 +60,7 @@ class LayerFlatten(Layer):
     """
 
     def __init__(self, name: str | None = None):
-        super().__init__(layer_type=Layers_type.FLATTEN, name=name)
+        super().__init__(layer_type=LAYER_TYPE.FLATTEN, name=name)
         self.previous_shape = None
 
     def forward(self, data_in: np.ndarray) -> np.ndarray:
@@ -114,7 +114,7 @@ class LayerFlatten(Layer):
         """
         pass
 
-    def get_activation_function(self) -> Activation_fn | None:
+    def get_activation_function(self) -> ACTIVATION_FN | None:
         return None
 
     def get_parameters(self):
@@ -127,7 +127,6 @@ class LayerFlatten(Layer):
         pass
 
 
-# TODO: continue form Gradient
 class LayerConv(Layer):
     """
     Convolutional Layer class
@@ -142,7 +141,7 @@ class LayerConv(Layer):
         name: str | None = None,
     ):
         super().__init__(
-            layer_type=Layers_type.CONVOLUTIONAL,
+            layer_type=LAYER_TYPE.CONVOLUTIONAL,
             input_shape=input_shape,
             name=name,
         )
@@ -219,9 +218,9 @@ class LayerConv(Layer):
         fan_in = filter_size * filter_size * n_channels
 
         # This Due a instability in the training process, numeric overflow
-        if activation == Activation_fn.RELU:
+        if activation == ACTIVATION_FN.RELU:
             scale = np.sqrt(2.0 / fan_in)  # He
-        elif activation in {Activation_fn.SIGMOID, Activation_fn.TANH}:
+        elif activation in {ACTIVATION_FN.SIGMOID, ACTIVATION_FN.TANH}:
             scale = np.sqrt(1.0 / fan_in)  # Xavier
         else:
             scale = 0.01
@@ -329,11 +328,11 @@ class LayerConv(Layer):
 
         fnc = specification.activation
 
-        if fnc == Activation_fn.RELU:
+        if fnc == ACTIVATION_FN.RELU:
             return np.maximum(0, data_in)
-        elif fnc == Activation_fn.SIGMOID:
+        elif fnc == ACTIVATION_FN.SIGMOID:
             return 1 / (1 + np.exp(-data_in))
-        elif fnc == Activation_fn.TANH:
+        elif fnc == ACTIVATION_FN.TANH:
             return np.tanh(data_in)
         else:
             raise ValueError(f"Unsupported activation function: {fnc}")
@@ -403,12 +402,12 @@ class LayerConv(Layer):
         parameters_gradient --
         """
         activation = self.specification.activation
-        if activation == Activation_fn.RELU:
+        if activation == ACTIVATION_FN.RELU:
             dZ = np.where(self.cache.data_conv > 0, gradient_in, 0)
-        elif activation == Activation_fn.SIGMOID:
+        elif activation == ACTIVATION_FN.SIGMOID:
             sig = self.cache.data_act
             dZ = sig * (1 - sig) * gradient_in
-        elif activation == Activation_fn.TANH:
+        elif activation == ACTIVATION_FN.TANH:
             dZ = (1 - np.square(self.cache.data_act)) * gradient_in
         else:
             raise ValueError(f"Unsupported activation function: {activation}")
@@ -515,7 +514,7 @@ class LayerConv(Layer):
         self.parameters.W -= learning_rate * self.gradient.dW
         self.parameters.b -= learning_rate * self.gradient.db
 
-    def get_activation_function(self) -> Activation_fn | None:
+    def get_activation_function(self) -> ACTIVATION_FN | None:
         return self.specification.activation
 
     def get_parameters(self):
@@ -536,7 +535,7 @@ class LayerPooling(Layer):
         name: str | None = None,
     ):
         super().__init__(
-            layer_type=Layers_type.POOLING,
+            layer_type=LAYER_TYPE.POOLING,
             name=name,
         )
         self.cache = Cache_pooling(
@@ -617,9 +616,9 @@ class LayerPooling(Layer):
 
                         X_slice = data_in[b, h_start:h_end, w_start:w_end, f]
 
-                        if fnc == Pooling_fn.MAX:
+                        if fnc == POOLING_FN.MAX:
                             data_out[b, h, w, f] = np.max(X_slice)
-                        elif fnc == Pooling_fn.AVERAGE:
+                        elif fnc == POOLING_FN.AVERAGE:
                             data_out[b, h, w, f] = np.mean(X_slice)
                         else:
                             raise ValueError(f"Unsupported pooling function: {fnc}")
@@ -672,7 +671,7 @@ class LayerPooling(Layer):
                         if window.size == 0:  # Skip empty windows
                             continue
 
-                        if self.specification.p_function == Pooling_fn.MAX:
+                        if self.specification.p_function == POOLING_FN.MAX:
                             idx = np.unravel_index(np.argmax(window), window.shape)
                             i_max, j_max = idx
 
@@ -680,7 +679,7 @@ class LayerPooling(Layer):
                                 b, h_start + i_max, w_start + j_max, current_filter
                             ] += gradient_in[b, p, q, current_filter]
 
-                        elif self.specification.p_function == Pooling_fn.AVERAGE:
+                        elif self.specification.p_function == POOLING_FN.AVERAGE:
                             avg_grad = (
                                 gradient_in[b, p, q, current_filter] / window.size
                             )
@@ -699,7 +698,7 @@ class LayerPooling(Layer):
 
         return dZ, Gradient(dW, db)
 
-    def get_activation_function(self) -> Activation_fn | None:
+    def get_activation_function(self) -> ACTIVATION_FN | None:
         return None
 
     def get_parameters(self):

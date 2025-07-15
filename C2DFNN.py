@@ -4,22 +4,26 @@ import numpy as np
 from tensorflow.keras.datasets import mnist  # type: ignore
 from dataclasses import dataclass
 from enum import Enum
-from Layer import Layer, Layers_type, Activation_fn
+from Layer import Layer, LAYER_TYPE, ACTIVATION_FN
 from LayerDense_v2 import LayerDense
 from LayerConv import (
     LayerConv,
     LayerFlatten,
     LayerPooling,
-    Pooling_fn,
+    POOLING_FN,
     Specification_conv,
     Specification_pooling,
 )
 
 
-class loss_fn(Enum):
+class LOSS_FN(Enum):
     CATEGORICAL_CROSSENTROPY = "categorical_crossentropy"
     MEAN_SQUARED_ERROR = "mse"
     BINARY_CROSSENTROPY = "binary_crossentropy"
+
+
+class OPTIMIZER(Enum):
+    MOMENTUM = "momentum"
 
 
 @dataclass
@@ -46,13 +50,13 @@ class Network:
                 )
 
             if layer.name is None:
-                if layer.get_layer_type() == Layers_type.CONVOLUTIONAL:
+                if layer.get_layer_type() == LAYER_TYPE.CONVOLUTIONAL:
                     layer.name = f"conv_layer_{i} "
-                elif layer.get_layer_type() == Layers_type.DENSE:
+                elif layer.get_layer_type() == LAYER_TYPE.DENSE:
                     layer.name = f"dense_layer_{i}"
-                elif layer.get_layer_type() == Layers_type.FLATTEN:
+                elif layer.get_layer_type() == LAYER_TYPE.FLATTEN:
                     layer.name = f"flat_layer_{i} "
-                elif layer.get_layer_type() == Layers_type.POOLING:
+                elif layer.get_layer_type() == LAYER_TYPE.POOLING:
                     layer.name = f"pool_layer_{i} "
 
             previous_layer = self.layers[i - 1]
@@ -80,10 +84,10 @@ class Network:
         Yp = self.predict(X)
         output_activation = self.layers[-1].get_activation_function()
 
-        if output_activation == Activation_fn.SOFTMAX:
+        if output_activation == ACTIVATION_FN.SOFTMAX:
             Yp_labels = np.argmax(Yp, axis=1)
             Y_true = np.argmax(Y, axis=1)
-        elif output_activation == Activation_fn.SIGMOID:
+        elif output_activation == ACTIVATION_FN.SIGMOID:
             Yp_labels = (Yp > 0.5).astype(int)
             Y_true = Y.astype(int)
         else:
@@ -94,24 +98,24 @@ class Network:
         acc = np.mean(Yp_labels == Y_true)
         return acc
 
-    def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn) -> np.ndarray:
+    def cost(self, Yp: np.ndarray, Y: np.ndarray, costfunction: LOSS_FN) -> np.ndarray:
         output_activation = self.layers[-1].get_activation_function()
 
         # clipped values to avoid log(0)
         if (
-            costfunction == loss_fn.CATEGORICAL_CROSSENTROPY
-            and output_activation == Activation_fn.SOFTMAX
+            costfunction == LOSS_FN.CATEGORICAL_CROSSENTROPY
+            and output_activation == ACTIVATION_FN.SOFTMAX
         ):
             Yp_clipped = np.clip(Yp, 1e-15, 1 - 1e-15)
             return -np.sum(Y * np.log(Yp_clipped), axis=1)
         elif (
-            costfunction == loss_fn.MEAN_SQUARED_ERROR
-            and output_activation == Activation_fn.RELU
+            costfunction == LOSS_FN.MEAN_SQUARED_ERROR
+            and output_activation == ACTIVATION_FN.RELU
         ):
             return np.mean(np.square(Y - Yp), axis=1)
         elif (
-            costfunction == loss_fn.BINARY_CROSSENTROPY
-            and output_activation == Activation_fn.SIGMOID
+            costfunction == LOSS_FN.BINARY_CROSSENTROPY
+            and output_activation == ACTIVATION_FN.SIGMOID
         ):
             Yp_clipped = np.clip(Yp, 1e-15, 1 - 1e-15)
             return -np.mean(
@@ -123,25 +127,25 @@ class Network:
             )
 
     def d_cost(
-        self, Yp: np.ndarray, Y: np.ndarray, costfunction: loss_fn
+        self, Yp: np.ndarray, Y: np.ndarray, costfunction: LOSS_FN
     ) -> np.ndarray:
-        if costfunction == loss_fn.CATEGORICAL_CROSSENTROPY:
+        if costfunction == LOSS_FN.CATEGORICAL_CROSSENTROPY:
             return Yp - Y
-        elif costfunction == loss_fn.MEAN_SQUARED_ERROR:
+        elif costfunction == LOSS_FN.MEAN_SQUARED_ERROR:
             return 2 * (Yp - Y) / Y.shape[0]
-        elif costfunction == loss_fn.BINARY_CROSSENTROPY:
+        elif costfunction == LOSS_FN.BINARY_CROSSENTROPY:
             Yp_clipped = np.clip(Yp, 1e-15, 1 - 1e-15)
             return -Y / Yp_clipped + (1 - Y) / (1 - Yp_clipped)
         else:
             raise ValueError(
-                f"Unsupported cost function: {costfunction}. Supported functions are: {list(loss_fn)}."
+                f"Unsupported cost function: {costfunction}. Supported functions are: {list(LOSS_FN)}."
             )
 
     def train(
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        cost_function: loss_fn,
+        cost_function: LOSS_FN,
         learning_rate: float = 0.01,
         epochs: int = 50,
         batch_size: int = 16,
@@ -246,17 +250,17 @@ if __name__ == "__main__":
                 c_filters=4,
                 c_stride=2,
                 c_pad=0,
-                activation=Activation_fn.RELU,
+                activation=ACTIVATION_FN.RELU,
             ),
         ),
         LayerPooling(
             specification=Specification_pooling(
-                p_filter=2, p_stride=2, p_function=Pooling_fn.MAX
+                p_filter=2, p_stride=2, p_function=POOLING_FN.MAX
             ),
         ),
         LayerFlatten(),
-        LayerDense((16,), Activation_fn.RELU),
-        LayerDense((10,), Activation_fn.SOFTMAX, name="output_layer"),
+        LayerDense((16,), ACTIVATION_FN.RELU),
+        LayerDense((10,), ACTIVATION_FN.SOFTMAX, name="output_layer"),
     ]
 
     network = Network(LayersConfig(layers))
@@ -266,7 +270,7 @@ if __name__ == "__main__":
     network.train(
         X=X_train,
         Y=Y_train,
-        cost_function=loss_fn.CATEGORICAL_CROSSENTROPY,
+        cost_function=LOSS_FN.CATEGORICAL_CROSSENTROPY,
         learning_rate=0.001,
         epochs=10,
         print_cost=True,

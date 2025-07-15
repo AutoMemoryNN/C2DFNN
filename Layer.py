@@ -4,14 +4,14 @@ from enum import Enum
 import numpy as np
 
 
-class Layers_type(Enum):
+class LAYER_TYPE(Enum):
     CONVOLUTIONAL = "convolutional"
     POOLING = "pooling"
     FLATTEN = "flatten"
     DENSE = "dense"
 
 
-class Activation_fn(Enum):
+class ACTIVATION_FN(Enum):
     RELU = "relu"
     SIGMOID = "sigmoid"
     TANH = "tanh"
@@ -21,7 +21,7 @@ class Activation_fn(Enum):
 class Layer(ABC):
     def __init__(
         self,
-        layer_type: Layers_type,
+        layer_type: LAYER_TYPE,
         input_shape: tuple[int, ...] | None = None,
         name: str | None = None,
     ):
@@ -58,7 +58,7 @@ class Layer(ABC):
         raise NotImplementedError("This method should be overridden in subclasses")
 
     @abstractmethod
-    def get_activation_function(self) -> Activation_fn | None:
+    def get_activation_function(self) -> ACTIVATION_FN | None:
         raise NotImplementedError("This method should be overridden in subclasses")
 
     @abstractmethod

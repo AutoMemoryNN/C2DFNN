@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import numpy as np
-from Layer import Layer, Layers_type, Activation_fn
+from Layer import Layer, LAYER_TYPE, ACTIVATION_FN
 
 
 @dataclass
@@ -26,12 +26,12 @@ class LayerDense(Layer):
     def __init__(
         self,
         output_shape: tuple[int],
-        activation_fn: Activation_fn,
+        activation_fn: ACTIVATION_FN,
         input_shape: tuple[int] | None = None,
         name: str | None = None,
     ):
         super().__init__(
-            layer_type=Layers_type.DENSE, input_shape=input_shape, name=name
+            layer_type=LAYER_TYPE.DENSE, input_shape=input_shape, name=name
         )
 
         self.output_shape = (
@@ -68,9 +68,9 @@ class LayerDense(Layer):
         n_out = self.output_shape[1]  # output_shape (1, n_neurons_post)
 
         # This Due a instability in the training process, numeric overflow
-        if self.activation_fn == Activation_fn.RELU:
+        if self.activation_fn == ACTIVATION_FN.RELU:
             scale = np.sqrt(2.0 / n_in)  # He
-        elif self.activation_fn in {Activation_fn.SIGMOID, Activation_fn.TANH}:
+        elif self.activation_fn in {ACTIVATION_FN.SIGMOID, ACTIVATION_FN.TANH}:
             scale = np.sqrt(1.0 / n_in)  # Xavier
         else:
             scale = 0.01
@@ -109,13 +109,13 @@ class LayerDense(Layer):
         activation = self.activation_fn
         Z_current = None
 
-        if activation == Activation_fn.RELU:
+        if activation == ACTIVATION_FN.RELU:
             Z_current = np.maximum(0, A_current)
-        elif activation == Activation_fn.SIGMOID:
+        elif activation == ACTIVATION_FN.SIGMOID:
             Z_current = 1 / (1 + np.exp(-A_current))
-        elif activation == Activation_fn.TANH:
+        elif activation == ACTIVATION_FN.TANH:
             Z_current = np.tanh(A_current)
-        elif activation == Activation_fn.SOFTMAX:
+        elif activation == ACTIVATION_FN.SOFTMAX:
             exp_values = np.exp(A_current - np.max(A_current, axis=1, keepdims=True))
             Z_current = exp_values / np.sum(exp_values, axis=1, keepdims=True)
         else:
@@ -158,14 +158,14 @@ class LayerDense(Layer):
 
         g = self.activation_fn
 
-        if g == Activation_fn.SIGMOID:
+        if g == ACTIVATION_FN.SIGMOID:
             s = 1 / (1 + np.exp(-Z_current))
             dg = s * (1 - s)
-        elif g == Activation_fn.RELU:
+        elif g == ACTIVATION_FN.RELU:
             dg = np.where(Z_current > 0, 1, 0)
-        elif g == Activation_fn.TANH:
+        elif g == ACTIVATION_FN.TANH:
             dg = 1 - np.tanh(Z_current) ** 2
-        elif g == Activation_fn.SOFTMAX:
+        elif g == ACTIVATION_FN.SOFTMAX:
             dg = 1
         else:
             raise ValueError("Función de activación desconocida: " + g)
@@ -223,7 +223,7 @@ class LayerDense(Layer):
 
         self.already_backwarded = False
 
-    def get_activation_function(self) -> Activation_fn:
+    def get_activation_function(self) -> ACTIVATION_FN:
         return self.activation_fn
 
     def get_parameters(self):

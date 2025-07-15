@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from Layer import Layer, Layers_type
+from Layer import Layer, LAYER_TYPE
 
 
 class LayerDense(Layer):
 
     def __init__(self, input_shape: tuple[int], output_shape, activation, name):
         super().__init__(
-            layer_type=Layers_type.DENSE, input_shape=input_shape, name=name
+            layer_type=LAYER_TYPE.DENSE, input_shape=input_shape, name=name
         )
         self.output_shape = output_shape
         self.activation = activation.lower()
@@ -401,5 +401,5 @@ class LayerDense(Layer):
     class LayerDense(Layer):
         def __init__(self, input_shape: tuple[int], output_shape, activation, name):
             super().__init__(
-                layer_type=Layers_type.DENSE, input_shape=input_shape, name=name
+                layer_type=LAYER_TYPE.DENSE, input_shape=input_shape, name=name
             )
