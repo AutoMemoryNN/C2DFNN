@@ -419,13 +419,9 @@ class LayerConv(Layer):
         else:
             raise ValueError(f"Unsupported activation function: {activation}")
 
-        # Activation has no parameters
-        dW = np.array([])
-        db = np.array([])
+        return dZ
 
-        return dZ, Gradient(dW, db)
-
-    def _backward_convolution_step(self, gradient_in):
+    def _backward_convolution_step(self, gradient_Z_act):
         """
         Do a backward convolution step
         Arguments:
@@ -439,21 +435,16 @@ class LayerConv(Layer):
         n_filters = self.specification.c_filters
         pad = self.specification.c_pad
 
-        # Get dimensions
-        batch_size, h_out, w_out, n_f = gradient_in.shape
+        batch_size, h_out, w_out, n_f = gradient_Z_act.shape
 
         # Add padding to input data for gradient computation
-        data_in_padded = self._add_pad(self.cache.data_in, pad)
+        g_Z_act_padded = self._add_pad(self.cache.data_in, pad)
 
-        # Initialize gradients with correct shapes and ensure float dtype
         dW = np.zeros_like(self.parameters.W, dtype=np.float64)
         db = np.zeros_like(self.parameters.b, dtype=np.float64)
-        dA_prev = np.zeros_like(data_in_padded, dtype=np.float64)
+        dA_prev = np.zeros_like(g_Z_act_padded, dtype=np.float64)
 
-        # Ensure gradient_in is float type
-        gradient_in = gradient_in.astype(np.float64)
-
-        # Compute gradients
+        gradient_Z_act = gradient_Z_act.astype(np.float64)
 
         for b in range(batch_size):
             for h in range(h_out):
@@ -465,20 +456,18 @@ class LayerConv(Layer):
                         w_start = w * stride
                         w_end = w_start + filter_size
 
-                        # Extract slice from padded input and ensure float type
-                        a_slice = data_in_padded[
+                        # Extract window: b, i (height) * s + u (f_h), j (width) * s + v (f_w), c -> batch, h_start:h_end, w_start:w_end, all channels
+                        z_prev_slice = g_Z_act_padded[
                             b, h_start:h_end, w_start:w_end, :
                         ].astype(np.float64)
 
-                        # Update gradients
-                        dW[:, :, :, f] += a_slice * gradient_in[b, h, w, f]
-                        db[0, 0, 0, f] += gradient_in[b, h, w, f]
+                        # Ecuacion core: dL/dW = sum_(batch, h, w, f (info get duplicated cross channels)) of: Z_l-1 * dL/dZ_act = Z_l-1 * g'(A_l) * dL/dZ_l+1
+                        dW[:, :, :, f] += z_prev_slice * gradient_Z_act[b, h, w, f]
+                        db[0, 0, 0, f] += gradient_Z_act[b, h, w, f]
 
-                        # Update gradient w.r.t. input
-                        # Only propagate to the channels that were actually used
-                        dA_prev[b, h_start:h_end, w_start:w_end, :n_f] += (
+                        dA_prev[b, h_start:h_end, w_start:w_end, :] += (
                             self.parameters.W[:, :, :, f].astype(np.float64)
-                            * gradient_in[b, h, w, f]
+                            * gradient_Z_act[b, h, w, f]
                         )
 
         # Remove padding from input gradients if padding was applied
@@ -499,7 +488,7 @@ class LayerConv(Layer):
         cost_gradient_out –-
         parameters_gradient --
         """
-        dA_act, gradient_act = self._backward_activation_step(gradient_in)
+        dA_act = self._backward_activation_step(gradient_in)
 
         dA_conv, grad_conv = self._backward_convolution_step(dA_act)
 
