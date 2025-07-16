@@ -1,7 +1,10 @@
+import time
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np
+import cv2
 
 from tensorflow.keras.datasets import mnist  # type: ignore
+from sklearn.model_selection import train_test_split
 from dataclasses import dataclass
 from enum import Enum
 from Layer import Layer, LAYER_TYPE, ACTIVATION_FN, OptimizerConfig, MomentumConfig
@@ -147,10 +150,14 @@ class Network:
         batch_size: int = 16,
         print_cost=False,
         show_graph=False,
+        X_test: np.ndarray | None = None,
+        Y_test: np.ndarray | None = None,
     ):
         costs = []
+        self.train_accuracies = []
 
         for epoch in range(epochs):
+            start_time = time.time()
             epoch_costs = []
 
             for i in range((X.shape[0] + batch_size - 1) // batch_size):
@@ -165,7 +172,10 @@ class Network:
 
                 # Cost
                 cost = self.cost(Z, y, cost_function)
-                epoch_costs.append(cost)
+
+                batch_cost = np.mean(cost)
+
+                epoch_costs.append(batch_cost)
 
                 # Backward
                 dA = self.d_cost(Z, y, cost_function)
@@ -178,26 +188,65 @@ class Network:
                     layer.update_parameters(optimizerConfig=optimizerConfig)
 
                 if i % 10 == 0 and print_cost:
-                    print(f"Epoch {epoch}, Sample {i}, Cost: {np.mean(cost)}")
+                    print(
+                        f"[Epoch {epoch + 1}/{epochs}] Batch {i + 1}/{(X.shape[0] + batch_size - 1) // batch_size} | "
+                        f"Cost: {batch_cost:.6f}"
+                    )
 
+            # each epoch
             mean_cost = np.mean(epoch_costs)
+            acc = self.accuracy(X, Y)
             costs.append(mean_cost)
+            self.train_accuracies.append(acc)
+            epoch_time = time.time() - start_time
 
-            if print_cost and epoch % 10 == 0:
-                print(f"Epoch {epoch}, Cost: {mean_cost}")
-            if show_graph and epoch % 10 == 0:
-                self.graph_cost(np.array(costs))
+            if print_cost:
+                print(
+                    f"[Epoch {epoch+1}/{epochs}] Cost: {mean_cost:.6f} | "
+                    f"Train Accuracy: {acc * 100:.2f}% | Time: {epoch_time:.2f}s"
+                )
 
-    def graph_cost(self, costs: np.ndarray):
+        if show_graph:
+            self.graph_cost(np.array(costs), np.array(self.train_accuracies))
 
-        plt.plot(costs)
-        plt.xlabel("Epochs")
-        plt.ylabel("Cost")
-        plt.title("Cost over epochs")
+        # Comparar contra test si se pasa
+        if X_test is not None and Y_test is not None:
+            test_acc = self.accuracy(X_test, Y_test)
+            print(
+                f"\nFinal Train Accuracy: {self.train_accuracies[-1] * 100:.2f}%\n"
+                f"Test Accuracy:         {test_acc * 100:.2f}%"
+            )
+
+    def graph_cost(self, costs: np.ndarray, accuracies: np.ndarray):
+        epochs = np.arange(1, len(costs) + 1)
+        fig, ax1 = plt.subplots(figsize=(10, 5))
+
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Cost", color="tab:blue")
+        ax1.plot(epochs, costs, marker="o", color="tab:blue", label="Cost")
+        ax1.tick_params(axis="y", labelcolor="tab:blue")
+
+        best_epoch = np.argmin(costs) + 1
+        ax1.axvline(
+            x=float(best_epoch),
+            color="red",
+            linestyle="--",
+            label=f"Min Cost (Epoch {best_epoch})",
+        )
+        ax1.scatter(best_epoch, costs[best_epoch - 1], color="red")
+
+        ax2 = ax1.twinx()
+        ax2.set_ylabel("Accuracy", color="tab:green")
+        ax2.plot(
+            epochs, accuracies * 100, marker="s", color="tab:green", label="Accuracy"
+        )
+        ax2.tick_params(axis="y", labelcolor="tab:green")
+
+        fig.tight_layout()
+        plt.title("Training Progress: Cost and Accuracy")
+        fig.legend(loc="upper right", bbox_to_anchor=(1, 0.85))
+        plt.grid(True)
         plt.show()
-
-    def one_hot_encode(self, y, num_classes):
-        return np.eye(num_classes)[y.astype(int)].reshape(-1, num_classes)
 
     def __repr__(self):
         summary = ["Network Architecture:"]
@@ -217,29 +266,58 @@ class Network:
         return "\n".join(summary)
 
 
+def one_hot_encode(y, num_classes):
+    return np.eye(num_classes)[y.astype(int)].reshape(-1, num_classes)
+
+
+# IA Generated
+def reduce_mnist_by_category(X, y, reduce_fraction=0.5, target_size=(14, 14)):
+    selected_X = []
+    selected_y = []
+
+    for label in np.unique(y):
+        idx = np.where(y == label)[0]
+        np.random.shuffle(idx)
+        keep_n = int(len(idx) * reduce_fraction)
+        selected_idx = idx[:keep_n]
+        selected_X.append(X[selected_idx])
+        selected_y.append(y[selected_idx])
+
+    reduced_X = np.concatenate(selected_X)
+    reduced_y = np.concatenate(selected_y)
+
+    # Mezclar los datos
+    perm = np.random.permutation(len(reduced_y))
+    reduced_X = reduced_X[perm]
+    reduced_y = reduced_y[perm]
+
+    # Redimensionar imágenes (por ejemplo, a 14x14)
+    resized_X = np.array([cv2.resize(img, target_size) for img in reduced_X])
+    resized_X = resized_X.astype(np.float64) / 255.0
+    resized_X = resized_X.reshape(-1, target_size[0], target_size[1], 1)
+
+    return resized_X, reduced_y
+
+
 if __name__ == "__main__":
+    (X_raw, y_raw), (_, _) = mnist.load_data()
 
-    # Cargar y preprocesar MNIST
-    (X_train, y_train), (_, _) = mnist.load_data()
-    X_train = X_train
-    y_train = y_train
+    # Reduce MNIST
+    X_reduced, y_reduced = reduce_mnist_by_category(
+        X_raw, y_raw, reduce_fraction=0.5, target_size=(14, 14)
+    )
 
-    # Normalizar y agregar canal
-    X_train = X_train.astype(np.float64) / 255.0
-    X_train = X_train.reshape(-1, 28, 28, 1)  # (batch, 28, 28, 1)
+    # 85% train, 15% test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_reduced, y_reduced, test_size=0.15, stratify=y_reduced, random_state=42
+    )
 
-    print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+    print(f"Train shape: {X_train.shape}, Test shape: {X_test.shape}")
 
-    # One-hot encode
-    network = Network(
-        LayersConfig([])
-    )  # temp instantiation just to access one_hot_encode
-    Y_train = network.one_hot_encode(y_train, num_classes=10)
-
-    # Crear red
+    # Define layers
     layers = [
         LayerConv(
-            input_shape=(1, 28, 28, 1),
+            input_shape=(1, 14, 14, 1),
             specification=Specification_conv(
                 c_filter=4,
                 c_channels=1,
@@ -265,10 +343,12 @@ if __name__ == "__main__":
 
     network.train(
         X=X_train,
-        Y=Y_train,
+        Y=one_hot_encode(y_train, num_classes=10),
         cost_function=LOSS_FN.CATEGORICAL_CROSSENTROPY,
-        optimizerConfig=MomentumConfig(learning_rate=0.01, momentum=0.9),
+        optimizerConfig=MomentumConfig(learning_rate=0.005, momentum=0.75),
         epochs=10,
         print_cost=True,
-        show_graph=False,
+        show_graph=True,
+        X_test=X_test,
+        Y_test=one_hot_encode(y_test, num_classes=10),
     )
